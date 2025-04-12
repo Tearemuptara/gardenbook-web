@@ -1,0 +1,11 @@
+mcp-python
+langchain-core
+langchain-anthropic
+langchain-ollama
+langgraph
+langchain-mcp-adapters
+python-dotenv
+pymongo
+# Testing dependencies
+pytest
+pytest-asyncio

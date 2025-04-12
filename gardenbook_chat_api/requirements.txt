@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+mcp-python
+langchain-core
+langchain-anthropic
+langchain-ollama
+langgraph
+langchain-mcp-adapters
+python-dotenv
+pymongo 

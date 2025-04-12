@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# tests
+
+## gardenbook-ui
+- To run tests for gardenbook-ui:
+  1. Navigate to the directory: `cd gardenbook-ui`
+  2. Run all tests: `npm test`
+  3. Run tests in watch mode (for development): `npm run test:watch`
+- Test suite structure:
+  - __tests__/components/: Tests for UI components
+    - TabNavigation.test.tsx: Tests rendering, active state logic, and navigation
+  - __tests__/api/: Tests for API routes
+    - plants.test.ts: Tests the plants endpoint for success and error cases
+  - __tests__/pages/: Tests for page components
+    - MyPlantsPage.test.tsx: Tests loading states, data display, and error handling
+- All tests use mocks for external dependencies (next/navigation, fetch API)
+- React Testing Library is used for component testing
+
+# run
+
+## gardenbook-ui
+
+- To run gardenbook-ui locally:
+  1. Navigate to the directory: `cd gardenbook-ui`
+  2. Install dependencies:
+     ```bash
+     npm install
+     ```
+  3. Start the development server:
+     ```bash
+     npm run dev
+     ```
+  4. Build for production:
+     ```bash
+     npm run build
+     ```
+  5. Start the production server:
+     ```bash
+     npm start
+     ```
+  6. The application will be available at: http://localhost:3000 (default Next.js port)

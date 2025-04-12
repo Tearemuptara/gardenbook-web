@@ -1,0 +1,38 @@
+version: '3'
+
+services:
+  frontend:
+    build:
+      context: ./gardenbook-ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gardenbook-db-api
+      - gardenbook-chat-api
+    environment:
+      - NEXT_PUBLIC_NODE_API_URL=http://gardenbook-db-api:3001
+      - NEXT_PUBLIC_CHAT_API_URL=http://gardenbook-chat-api:5000
+
+  gardenbook-db-api:
+    build:
+      context: ./gardenbook-db-api
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - CHAT_API_URL=http://gardenbook-chat-api:5000
+
+  gardenbook-chat-api:
+    build:
+      context: ./gardenbook_chat_api
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+
+networks:
+  default:
+    driver: bridge

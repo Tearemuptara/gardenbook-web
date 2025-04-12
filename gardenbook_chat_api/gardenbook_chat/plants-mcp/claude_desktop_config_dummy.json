@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+      "plants-mcp": {
+          "command": "uv",
+          "args": [
+              "--directory",
+              "/Users/mb/code/mcp/plants-mcp",
+              "run",
+              "garden_mcp.py"
+          ]
+      }
+  }
+}

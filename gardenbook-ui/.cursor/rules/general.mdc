@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# chat
+- make use of emojis in a techical/informational way, when helpful
+
+## python
+- always use `uv` istead of `pip`
+- always make sure you're in a venv virtual environment before installing dependencies or running any scripts or tests

@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gardenbook_chat_api"
+version = "0.1.0"
+description = "FastAPI server for Gardenbook Chat"
+readme = "README.md"
+requires-python = ">=3.9" 
