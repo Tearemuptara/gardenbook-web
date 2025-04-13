@@ -1,5 +1,7 @@
 # Python
 __pycache__/
+*/__pycache__/
+*/*/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -22,6 +24,8 @@ wheels/
 *.egg
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.*
 htmlcov/
 .tox/
 .nox/
