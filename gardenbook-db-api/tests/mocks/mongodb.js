@@ -12,12 +12,14 @@ const mockToArray = jest.fn().mockResolvedValue([]);
 const mockFind = jest.fn().mockReturnValue({ toArray: mockToArray });
 const mockFindOne = jest.fn();
 const mockInsertOne = jest.fn();
+const mockUpdateOne = jest.fn();
 const mockFindOneAndUpdate = jest.fn();
 const mockFindOneAndDelete = jest.fn();
 const mockCollection = {
   find: mockFind,
   findOne: mockFindOne,
   insertOne: mockInsertOne,
+  updateOne: mockUpdateOne,
   findOneAndUpdate: mockFindOneAndUpdate,
   findOneAndDelete: mockFindOneAndDelete
 };
@@ -44,6 +46,7 @@ module.exports = {
     find: mockFind,
     findOne: mockFindOne,
     insertOne: mockInsertOne,
+    updateOne: mockUpdateOne,
     findOneAndUpdate: mockFindOneAndUpdate,
     findOneAndDelete: mockFindOneAndDelete,
     toArray: mockToArray
