@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userModel = require('../models/user');
+const { ObjectId } = require('mongodb');
 
 /**
  * @swagger
@@ -81,6 +82,12 @@ router.get('/:id/encyclopedia', async (req, res) => {
   console.log(`[GET /users/${id}/encyclopedia] Request received`);
   
   try {
+    // Check if ID is a valid MongoDB ObjectId
+    if (!ObjectId.isValid(id)) {
+      console.log(`[GET /users/${id}/encyclopedia] Invalid ObjectId: ${id}`);
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
     const encyclopedia = await userModel.getEncyclopedia(id);
     if (encyclopedia === null) {
       console.log(`[GET /users/${id}/encyclopedia] User not found`);
@@ -142,6 +149,12 @@ router.post('/:id/encyclopedia', async (req, res) => {
   console.log(`[POST /users/${id}/encyclopedia] Request received with body:`, req.body);
   
   try {
+    // Check if ID is a valid MongoDB ObjectId
+    if (!ObjectId.isValid(id)) {
+      console.log(`[POST /users/${id}/encyclopedia] Invalid ObjectId: ${id}`);
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
     // Validate request body
     if (!req.body || !req.body.encyclopedia) {
       console.log(`[POST /users/${id}/encyclopedia] Invalid request: Missing encyclopedia data`);

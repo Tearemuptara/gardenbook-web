@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Valid MongoDB ObjectId (24 characters)
+const DEFAULT_USER_ID = '507f1f77bcf86cd799439011';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -12,8 +15,8 @@ export async function POST(request: Request) {
     }
 
     // Call backend API to update encyclopedia
-    // Using user ID 1 for now - in a real app, this would come from authentication
-    const userId = '1';
+    // Using a valid MongoDB ObjectId - in a real app, this would come from authentication
+    const userId = DEFAULT_USER_ID;
     // Use the environment variable for API URL
     const apiUrl = process.env.NEXT_PUBLIC_NODE_API_URL || 'http://localhost:3001';
       
@@ -46,8 +49,8 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    // Using user ID 1 for now - in a real app, this would come from authentication
-    const userId = '1';
+    // Using a valid MongoDB ObjectId - in a real app, this would come from authentication
+    const userId = DEFAULT_USER_ID;
     // Use the environment variable for API URL
     const apiUrl = process.env.NEXT_PUBLIC_NODE_API_URL || 'http://localhost:3001';
       
