@@ -11,8 +11,10 @@ def stop_docker_containers():
     """Stop any running docker-compose containers"""
     print("Stopping existing Docker containers...")
     try:
+        # Redirect stdout to /dev/null to reduce verbosity
         subprocess.run(["docker-compose", "down"], 
-                       capture_output=True, text=True, check=True)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, 
+                       text=True, check=True)
         print("✅ Existing containers stopped successfully")
         return True
     except subprocess.CalledProcessError as e:
@@ -26,9 +28,10 @@ def start_docker_containers():
     """Start docker-compose containers"""
     print("Starting Docker containers...")
     try:
-        # Build and start containers in detached mode
+        # Build and start containers in detached mode, suppressing stdout
         process = subprocess.run(["docker-compose", "up", "--build", "-d"], 
-                       capture_output=True, text=True, check=True)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, 
+                       text=True, check=True)
         
         # Give containers time to fully start
         print("\nWaiting for containers to initialize:")
@@ -51,7 +54,7 @@ def start_docker_containers():
             # Check container status periodically
             if i % 4 == 0:  # Every 2 seconds
                 status = subprocess.run(["docker-compose", "ps", "--services", "--filter", "status=running"],
-                                  capture_output=True, text=True)
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 running_services = status.stdout.strip().split('\n')
                 running_count = len([s for s in running_services if s])
                 
@@ -80,10 +83,10 @@ def check_docker_containers():
     try:
         # Check both running and exited containers to provide better diagnostics
         result_all = subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}}:{{.Status}}"], 
-                               capture_output=True, text=True, check=True)
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         
         result_running = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], 
-                               capture_output=True, text=True, check=True)
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         
         if not result_all.stdout.strip():
             print("❌ No Docker containers found. Make sure docker-compose up has been run.")
@@ -120,23 +123,23 @@ def check_docker_containers():
         print(f"DB API: {'✅ running' if db_api_running else '❌ not running'} {'(container exists but exited)' if db_api_exists and not db_api_running else ''}")
         print(f"Chat API: {'✅ running' if chat_api_running else '❌ not running'} {'(container exists but exited)' if chat_api_exists and not chat_api_running else ''}")
         
-        # Get logs for exited containers
+        # Get logs for exited containers but limit the output
         if frontend_exists and not frontend_running:
             print("\n=== Frontend Container Logs ===")
             logs = subprocess.run(["docker", "logs", "--tail", "10", next(name for name in all_containers.keys() if 'frontend' in name)], 
-                                capture_output=True, text=True)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             print(logs.stdout)
             
         if db_api_exists and not db_api_running:
             print("\n=== DB API Container Logs ===")
             logs = subprocess.run(["docker", "logs", "--tail", "10", next(name for name in all_containers.keys() if 'db-api' in name)], 
-                                capture_output=True, text=True)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             print(logs.stdout)
             
         if chat_api_exists and not chat_api_running:
             print("\n=== Chat API Container Logs ===")
             logs = subprocess.run(["docker", "logs", "--tail", "10", next(name for name in all_containers.keys() if 'chat-api' in name)], 
-                                capture_output=True, text=True)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             print(logs.stdout)
         
         if frontend_running and db_api_running and chat_api_running:

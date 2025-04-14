@@ -32,9 +32,9 @@ run_db_api_tests() {
     print_header "Running DB API Tests"
     cd gardenbook-db-api
     
-    # Run Jest with --forceExit flag to ensure it exits after tests
-    # We check the exit code for success/failure
-    npx jest --forceExit --silent
+    # Run Jest with flags to properly handle async operations
+    # --runInBand runs tests sequentially in the same process
+    npx jest --forceExit --detectOpenHandles --runInBand --silent
     if [ $? -eq 0 ]; then
         print_success "DB API tests passed"
     else
@@ -50,9 +50,9 @@ run_ui_tests() {
     print_header "Running UI Tests"
     cd gardenbook-ui
     
-    # Run Jest with --forceExit flag to ensure it exits after tests
-    # We check the exit code for success/failure
-    npx jest --forceExit --silent
+    # Run Jest with flags to properly handle async operations
+    # --runInBand runs tests sequentially in the same process
+    npx jest --forceExit --detectOpenHandles --runInBand --silent
     if [ $? -eq 0 ]; then
         print_success "UI tests passed"
     else
@@ -83,14 +83,14 @@ run_chat_api_tests() {
     # Run gardenbook_chat tests
     print_header "Running Gardenbook Chat Tests"
     
-    if python -m pytest gardenbook_chat/tests/test_gardenbook_chat.py -q; then
+    if python -m pytest gardenbook_chat/tests/test_gardenbook_chat.py -q 2>/dev/null; then
         print_success "Gardenbook Chat tests passed"
     else
         print_error "Gardenbook Chat tests failed"
         FAILURES=$((FAILURES+1))
     fi
     
-    if python -m pytest gardenbook_chat/tests/test_agent_behavior.py -q; then
+    if python -m pytest gardenbook_chat/tests/test_agent_behavior.py -q 2>/dev/null; then
         print_success "Agent Behavior tests passed"
     else
         print_error "Agent Behavior tests failed"
@@ -123,9 +123,12 @@ run_chat_api_tests() {
 test_docker_build() {
     print_header "Testing Docker Build"
     
+    # Set the COMPOSE_BAKE environment variable to avoid warnings
+    export COMPOSE_BAKE=true
+    
     echo "Building frontend container..."
-    # Run the build for the frontend service with full output
-    if docker-compose build frontend; then
+    # Redirect stdout to /dev/null to reduce verbosity while keeping stderr for errors
+    if docker-compose build frontend > /dev/null; then
         print_success "Frontend build succeeded"
     else
         print_error "Frontend build failed. See error above."
@@ -134,7 +137,7 @@ test_docker_build() {
     fi
     
     echo "Building gardenbook-db-api container..."
-    if docker-compose build gardenbook-db-api; then
+    if docker-compose build gardenbook-db-api > /dev/null; then
         print_success "DB API build succeeded"
     else
         print_error "DB API build failed. See error above."
@@ -143,13 +146,16 @@ test_docker_build() {
     fi
     
     echo "Building gardenbook-chat-api container..."
-    if docker-compose build gardenbook-chat-api; then
+    if docker-compose build gardenbook-chat-api > /dev/null; then
         print_success "Chat API build succeeded"
     else
         print_error "Chat API build failed. See error above."
         FAILURES=$((FAILURES+1))
         return 1
     fi
+    
+    # Unset the variable to avoid affecting other commands
+    unset COMPOSE_BAKE
     
     return 0
 }
@@ -164,6 +170,10 @@ run_system_tests() {
         return 1
     fi
     
+    # Set the COMPOSE_BAKE environment variable to avoid warnings
+    # for the docker-compose up command called by test_gardenbook.py
+    export COMPOSE_BAKE=true
+    
     # Make the test script executable
     chmod +x test_gardenbook.py
     
@@ -175,6 +185,9 @@ run_system_tests() {
         print_error "System tests failed"
         FAILURES=$((FAILURES+1))
     fi
+    
+    # Unset the variable to avoid affecting other commands
+    unset COMPOSE_BAKE
 }
 
 # Main function to run all tests
