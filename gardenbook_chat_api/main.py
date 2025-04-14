@@ -2,7 +2,7 @@ import os
 import sys
 import requests
 import traceback
-from typing import List
+from typing import List, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -22,7 +22,8 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-    userId: str = None  # Optional userId parameter to fetch encyclopedia data
+    userId: Optional[str] = None  # Optional userId parameter to fetch encyclopedia data
+    user_timezone: Optional[str] = None  # Optional timezone parameter for date/time awareness
 
 class ChatResponse(BaseModel):
     response: str
@@ -76,10 +77,16 @@ async def chat(chat_request: ChatRequest):
                 print(f"Error fetching encyclopedia data: {str(e)}")
                 # Continue with the chat even if encyclopedia data can't be fetched
         
+        # Get user timezone if provided
+        user_timezone = None
+        if chat_request.user_timezone:
+            user_timezone = chat_request.user_timezone
+            print(f"Using user-provided timezone: {user_timezone}")
+        
         try:
-            # Use the make_graph context manager
+            # Use the make_graph context manager with timezone if available
             print("Creating agent with make_graph...")
-            async with make_graph(encyclopedia_data=encyclopedia_data) as agent:
+            async with make_graph(encyclopedia_data=encyclopedia_data, user_timezone=user_timezone) as agent:
                 # Invoke the agent with the messages
                 print(f"Invoking agent with {len(langchain_messages)} messages...")
                 response = await agent.ainvoke({"messages": langchain_messages})
