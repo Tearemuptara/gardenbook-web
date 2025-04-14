@@ -126,15 +126,11 @@ run_system_tests() {
     # Make the test script executable
     chmod +x test_gardenbook.py
     
-    # Run the Python test script and check the exit code
-    ./test_gardenbook.py > /tmp/test_gardenbook_output.txt
+    # Run the Python test script directly and show full output
+    ./test_gardenbook.py
     if [ $? -eq 0 ]; then
-        # Display just the summary section
-        grep -A 10 "Test Summary" /tmp/test_gardenbook_output.txt
         print_success "System tests passed"
     else
-        # Display just the summary section
-        grep -A 10 "Test Summary" /tmp/test_gardenbook_output.txt
         print_error "System tests failed"
         FAILURES=$((FAILURES+1))
     fi

@@ -5,6 +5,74 @@ import time
 import sys
 import json
 import re
+import os
+
+def stop_docker_containers():
+    """Stop any running docker-compose containers"""
+    print("Stopping existing Docker containers...")
+    try:
+        subprocess.run(["docker-compose", "down"], 
+                       capture_output=True, text=True, check=True)
+        print("✅ Existing containers stopped successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error stopping Docker containers: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Unexpected error stopping containers: {e}")
+        return False
+
+def start_docker_containers():
+    """Start docker-compose containers"""
+    print("Starting Docker containers...")
+    try:
+        # Build and start containers in detached mode
+        process = subprocess.run(["docker-compose", "up", "--build", "-d"], 
+                       capture_output=True, text=True, check=True)
+        
+        # Give containers time to fully start
+        print("\nWaiting for containers to initialize:")
+        print("This may take up to 15 seconds...\n")
+        
+        # Define spinner animation
+        spinner = ["-", "\\", "|", "/"]
+        
+        # Wait for containers with a nice spinner animation
+        total_wait_time = 15  # seconds
+        interval = 0.5  # Check status every 0.5 seconds
+        steps = int(total_wait_time / interval)
+        
+        for i in range(steps):
+            # Update progress animation
+            percent_done = int((i / steps) * 100)
+            sys.stdout.write(f"\r{spinner[i % 4]} Container initialization: {percent_done}% complete ")
+            sys.stdout.flush()
+            
+            # Check container status periodically
+            if i % 4 == 0:  # Every 2 seconds
+                status = subprocess.run(["docker-compose", "ps", "--services", "--filter", "status=running"],
+                                  capture_output=True, text=True)
+                running_services = status.stdout.strip().split('\n')
+                running_count = len([s for s in running_services if s])
+                
+                # Show number of running containers
+                if running_count > 0:
+                    sys.stdout.write(f"({running_count}/3 services running)")
+                    sys.stdout.flush()
+            
+            time.sleep(interval)
+        
+        # Final status
+        sys.stdout.write("\r✅ Container initialization complete!              \n\n")
+        sys.stdout.flush()
+        
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"\n❌ Error starting Docker containers: {e}")
+        return False
+    except Exception as e:
+        print(f"\n❌ Unexpected error starting containers: {e}")
+        return False
 
 def check_docker_containers():
     """Check if all required Docker containers are running"""
@@ -201,13 +269,32 @@ def test_chat_api():
 
 def run_tests():
     """Run all tests and report results"""
-    print("=== Starting Gardenbook System Tests ===\n")
     
+    # Stop any existing containers
+    print("🔄 PHASE 1: PREPARING TEST ENVIRONMENT".ljust(60))
+    print("-"*60)
+    stop_docker_containers()
+    
+    # Start fresh containers
+    print("\n🔄 PHASE 2: STARTING SERVICES".ljust(60))
+    print("-"*60)
+    start_result = start_docker_containers()
+    if not start_result:
+        print("\n❌ Failed to start Docker containers. Aborting tests.")
+        return False
+    
+    # Check if containers are running as expected
+    print("\n🔄 PHASE 3: VERIFYING CONTAINER STATUS".ljust(60))
+    print("-"*60)
     containers_running = check_docker_containers()
     
     if not containers_running:
         print("\n❌ Docker container test failed. Please fix the container issues before continuing.")
         return False
+    
+    # Run individual service tests
+    print("\n🔄 PHASE 4: TESTING SERVICES".ljust(60))
+    print("-"*60)
     
     frontend_test = test_frontend()
     db_api_test = test_db_api()
@@ -215,12 +302,22 @@ def run_tests():
     
     all_tests_passed = frontend_test and db_api_test and chat_api_test
     
-    print("\n=== Test Summary ===")
+    # Print test summary
+    print("\n" + "="*60)
+    print("📊 TEST SUMMARY 📊".center(60))
+    print("="*60)
     print(f"Docker Containers: {'✅ PASS' if containers_running else '❌ FAIL'}")
-    print(f"Frontend Test: {'✅ PASS' if frontend_test else '❌ FAIL'}")
-    print(f"DB API Test: {'✅ PASS' if db_api_test else '❌ FAIL'}")
-    print(f"Chat API Test: {'✅ PASS' if chat_api_test else '❌ FAIL'}")
-    print(f"\nOverall Result: {'✅ ALL TESTS PASSED' if all_tests_passed else '❌ SOME TESTS FAILED'}")
+    print(f"Frontend Test:     {'✅ PASS' if frontend_test else '❌ FAIL'}")
+    print(f"DB API Test:       {'✅ PASS' if db_api_test else '❌ FAIL'}")
+    print(f"Chat API Test:     {'✅ PASS' if chat_api_test else '❌ FAIL'}")
+    print("-"*60)
+    
+    if all_tests_passed:
+        print("\n✅ ALL TESTS PASSED ✅".center(60))
+    else:
+        print("\n❌ SOME TESTS FAILED ❌".center(60))
+    
+    print("="*60)
     
     return all_tests_passed
 

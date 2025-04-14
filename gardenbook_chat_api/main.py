@@ -1,5 +1,7 @@
 import os
 import sys
+import requests
+import traceback
 from typing import List
 from contextlib import asynccontextmanager
 
@@ -20,6 +22,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
+    userId: str = None  # Optional userId parameter to fetch encyclopedia data
 
 class ChatResponse(BaseModel):
     response: str
@@ -56,15 +59,42 @@ async def chat(chat_request: ChatRequest):
             elif msg.role == "assistant":
                 langchain_messages.append(AIMessage(content=msg.content))
         
-        # Use the make_graph context manager
-        async with make_graph() as agent:
-            # Invoke the agent with the messages
-            response = await agent.ainvoke({"messages": langchain_messages})
-            assistant_response = response["messages"][-1].content
-            
-        return ChatResponse(response=assistant_response)
+        # Fetch encyclopedia data if userId is provided
+        encyclopedia_data = None
+        if chat_request.userId:
+            try:
+                # In Docker environment, use service name; otherwise use localhost
+                api_url = os.getenv("NODE_API_URL", "http://gardenbook-db-api:3001")
+                response = requests.get(f"{api_url}/api/users/{chat_request.userId}/encyclopedia")
+                
+                if response.status_code == 200:
+                    encyclopedia_data = response.json().get("encyclopedia", "")
+                    print(f"Successfully fetched encyclopedia data for user {chat_request.userId}")
+                else:
+                    print(f"Failed to fetch encyclopedia data: {response.status_code}, {response.text}")
+            except Exception as e:
+                print(f"Error fetching encyclopedia data: {str(e)}")
+                # Continue with the chat even if encyclopedia data can't be fetched
+        
+        try:
+            # Use the make_graph context manager
+            print("Creating agent with make_graph...")
+            async with make_graph(encyclopedia_data=encyclopedia_data) as agent:
+                # Invoke the agent with the messages
+                print(f"Invoking agent with {len(langchain_messages)} messages...")
+                response = await agent.ainvoke({"messages": langchain_messages})
+                print("Agent invocation successful")
+                assistant_response = response["messages"][-1].content
+                
+            return ChatResponse(response=assistant_response)
+        except Exception as e:
+            print(f"Error in agent processing: {str(e)}")
+            print(traceback.format_exc())
+            raise e
     
     except Exception as e:
+        print(f"Uncaught error in chat endpoint: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
 if __name__ == "__main__":
