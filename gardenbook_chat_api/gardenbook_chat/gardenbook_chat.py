@@ -1,6 +1,7 @@
 import asyncio
 import os
 import logging
+from datetime import datetime
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, AIMessage
@@ -34,9 +35,13 @@ async def make_graph(mcp_server_path=DEFAULT_MCP_SERVER_PATH, encyclopedia_data=
         # Get tools from the MCP server
         tools = client.get_tools()
         
+        # Get current date
+        current_date = datetime.now().strftime("%B %d, %Y")
+        
         # Build system prompt with encyclopedia data if available
-        system_prompt = """You are Gardenbook's AI gardening assistant. You provide helpful advice about plants, gardening, and plant care.
+        system_prompt = f"""You are Gardenbook's AI gardening assistant. You provide helpful advice about plants, gardening, and plant care.
 You have access to a set of tools that can help answer questions about plants in the user's garden.
+Today's date is {current_date}.
 Always be friendly, helpful, and focus on gardening-related topics."""
 
         # Incorporate encyclopedia data if available
