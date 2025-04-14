@@ -176,4 +176,334 @@ router.post('/:id/encyclopedia', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /users/{id}/context-cards:
+ *   get:
+ *     summary: Retrieve a user's context cards
+ *     description: Retrieve all context cards for a specific user
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the user to retrieve context cards for
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of context cards
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contextCards:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       content:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/:id/context-cards', async (req, res) => {
+  const id = req.params.id;
+  console.log(`[GET /users/${id}/context-cards] Request received`);
+  
+  try {
+    // Check if ID is a valid MongoDB ObjectId
+    if (!ObjectId.isValid(id)) {
+      console.log(`[GET /users/${id}/context-cards] Invalid ObjectId: ${id}`);
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    const contextCards = await userModel.getContextCards(id);
+    if (contextCards === null) {
+      console.log(`[GET /users/${id}/context-cards] User not found`);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log(`[GET /users/${id}/context-cards] Successfully retrieved ${contextCards.length} context cards`);
+    res.json({ contextCards });
+  } catch (error) {
+    console.error(`[GET /users/${id}/context-cards] Error:`, error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /users/{id}/context-cards:
+ *   post:
+ *     summary: Create a new context card
+ *     description: Create a new context card for a specific user
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the user to create a context card for
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - content
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Title of the context card
+ *               content:
+ *                 type: string
+ *                 description: Content of the context card
+ *     responses:
+ *       201:
+ *         description: Created context card
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contextCard:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     title:
+ *                       type: string
+ *                     content:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Invalid request data
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.post('/:id/context-cards', async (req, res) => {
+  const id = req.params.id;
+  console.log(`[POST /users/${id}/context-cards] Request received with body:`, req.body);
+  
+  try {
+    // Check if ID is a valid MongoDB ObjectId
+    if (!ObjectId.isValid(id)) {
+      console.log(`[POST /users/${id}/context-cards] Invalid ObjectId: ${id}`);
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Validate request body
+    if (!req.body || !req.body.title || !req.body.content) {
+      console.log(`[POST /users/${id}/context-cards] Invalid request: Missing required fields`);
+      return res.status(400).json({ error: 'Title and content are required' });
+    }
+    
+    // Create context card
+    const contextCard = await userModel.createContextCard(id, {
+      title: req.body.title,
+      content: req.body.content
+    });
+    
+    if (contextCard === null) {
+      console.log(`[POST /users/${id}/context-cards] User not found`);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log(`[POST /users/${id}/context-cards] Successfully created context card with id ${contextCard.id}`);
+    res.status(201).json({ contextCard });
+  } catch (error) {
+    console.error(`[POST /users/${id}/context-cards] Error:`, error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /users/{userId}/context-cards/{cardId}:
+ *   put:
+ *     summary: Update a context card
+ *     description: Update a specific context card for a user
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         description: ID of the user who owns the context card
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: cardId
+ *         required: true
+ *         description: ID of the context card to update
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - content
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Updated title of the context card
+ *               content:
+ *                 type: string
+ *                 description: Updated content of the context card
+ *     responses:
+ *       200:
+ *         description: Updated context card
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contextCard:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     title:
+ *                       type: string
+ *                     content:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Invalid request data
+ *       404:
+ *         description: User or context card not found
+ *       500:
+ *         description: Server error
+ */
+router.put('/:userId/context-cards/:cardId', async (req, res) => {
+  const userId = req.params.userId;
+  const cardId = req.params.cardId;
+  console.log(`[PUT /users/${userId}/context-cards/${cardId}] Request received with body:`, req.body);
+  
+  try {
+    // Check if IDs are valid MongoDB ObjectIds
+    if (!ObjectId.isValid(userId)) {
+      console.log(`[PUT /users/${userId}/context-cards/${cardId}] Invalid user ObjectId: ${userId}`);
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Validate request body
+    if (!req.body || !req.body.title || !req.body.content) {
+      console.log(`[PUT /users/${userId}/context-cards/${cardId}] Invalid request: Missing required fields`);
+      return res.status(400).json({ error: 'Title and content are required' });
+    }
+    
+    // Update context card
+    const contextCard = await userModel.updateContextCard(userId, cardId, {
+      title: req.body.title,
+      content: req.body.content
+    });
+    
+    if (contextCard === null) {
+      console.log(`[PUT /users/${userId}/context-cards/${cardId}] User or context card not found`);
+      return res.status(404).json({ error: 'User or context card not found' });
+    }
+    
+    console.log(`[PUT /users/${userId}/context-cards/${cardId}] Successfully updated context card`);
+    res.json({ contextCard });
+  } catch (error) {
+    console.error(`[PUT /users/${userId}/context-cards/${cardId}] Error:`, error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /users/{userId}/context-cards/{cardId}:
+ *   delete:
+ *     summary: Delete a context card
+ *     description: Delete a specific context card for a user
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         description: ID of the user who owns the context card
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: cardId
+ *         required: true
+ *         description: ID of the context card to delete
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Context card deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       400:
+ *         description: Invalid request data
+ *       404:
+ *         description: User or context card not found
+ *       500:
+ *         description: Server error
+ */
+router.delete('/:userId/context-cards/:cardId', async (req, res) => {
+  const userId = req.params.userId;
+  const cardId = req.params.cardId;
+  console.log(`[DELETE /users/${userId}/context-cards/${cardId}] Request received`);
+  
+  try {
+    // Check if IDs are valid MongoDB ObjectIds
+    if (!ObjectId.isValid(userId)) {
+      console.log(`[DELETE /users/${userId}/context-cards/${cardId}] Invalid user ObjectId: ${userId}`);
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Delete context card
+    const success = await userModel.deleteContextCard(userId, cardId);
+    
+    if (!success) {
+      console.log(`[DELETE /users/${userId}/context-cards/${cardId}] User or context card not found`);
+      return res.status(404).json({ error: 'User or context card not found' });
+    }
+    
+    console.log(`[DELETE /users/${userId}/context-cards/${cardId}] Successfully deleted context card`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[DELETE /users/${userId}/context-cards/${cardId}] Error:`, error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router; 

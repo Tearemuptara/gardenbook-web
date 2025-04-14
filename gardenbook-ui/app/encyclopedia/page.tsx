@@ -2,9 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import ContextCard from '../components/ContextCard';
+import { PlusIcon } from '@heroicons/react/24/outline';
+
+// Type definition for context card data
+interface ContextCard {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function EncyclopediaPage() {
-  const [text, setText] = useState('');
+  const [contextCards, setContextCards] = useState<ContextCard[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newContent, setNewContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -21,12 +35,12 @@ export default function EncyclopediaPage() {
     }
   }, []);
 
-  // Fetch existing encyclopedia data when the page loads
+  // Fetch existing context cards when the page loads
   useEffect(() => {
-    const fetchEncyclopediaData = async () => {
+    const fetchContextCards = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/encyclopedia');
+        const response = await fetch('/api/context-cards');
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -35,23 +49,23 @@ export default function EncyclopediaPage() {
         
         const result = await response.json();
         
-        if (result.success && result.data && result.data.encyclopedia) {
-          setText(result.data.encyclopedia);
+        if (result.success && result.data && result.data.contextCards) {
+          setContextCards(result.data.contextCards);
         }
       } catch (error: Error | unknown) {
-        console.error('Error loading encyclopedia data:', error);
-        setError('Failed to load existing data. The server might be unavailable. You can still add new information.');
+        console.error('Error loading context cards:', error);
+        setError('Failed to load existing data. The server might be unavailable.');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchEncyclopediaData();
+    fetchContextCards();
   }, []);
 
-  const handleSubmit = async () => {
-    if (!text.trim()) {
-      setError('Please enter some text before submitting');
+  const handleCreateContextCard = async () => {
+    if (!newTitle.trim() || !newContent.trim()) {
+      setError('Please enter both a title and content for the new card');
       return;
     }
     
@@ -60,15 +74,17 @@ export default function EncyclopediaPage() {
     setSuccessMessage('');
     
     try {
-      const response = await fetch('/api/encyclopedia', {
+      const response = await fetch('/api/context-cards', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ 
+          title: newTitle,
+          content: newContent
+        }),
       });
 
-      // Handle network errors
       if (!response) {
         throw new Error('Network error: Could not connect to the server');
       }
@@ -81,20 +97,142 @@ export default function EncyclopediaPage() {
       }
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to submit');
+        throw new Error(result.message || 'Failed to create card');
       }
 
-      setSuccessMessage('Your gardening information has been saved successfully!');
+      // Add the new card to the state
+      if (result.data && result.data.contextCard) {
+        setContextCards([...contextCards, result.data.contextCard]);
+      }
+      
+      setSuccessMessage('Your context card has been added successfully!');
+      setNewTitle('');
+      setNewContent('');
+      setIsCreating(false);
       router.refresh();
     } catch (error: Error | unknown) {
-      console.error('Error submitting:', error);
+      console.error('Error creating context card:', error);
       if (error instanceof Error && error.message && error.message.includes('Network error')) {
         setError('Could not connect to the server. Please check your connection and try again.');
       } else {
-        setError('Failed to save your information. Please try again.');
+        setError('Failed to create your context card. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateContextCard = async (id: string, title: string, content: string) => {
+    if (!title.trim() || !content.trim()) {
+      setError('Please enter both a title and content for the card');
+      return;
+    }
+    
+    setError('');
+    setSuccessMessage('');
+    
+    try {
+      const response = await fetch(`/api/context-cards/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title, content }),
+      });
+
+      if (!response) {
+        throw new Error('Network error: Could not connect to the server');
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error('Invalid response from server');
+      }
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update card');
+      }
+
+      // Update the card in the state
+      if (result.data && result.data.contextCard) {
+        setContextCards(contextCards.map(card => 
+          card.id === id ? result.data.contextCard : card
+        ));
+      }
+      
+      setSuccessMessage('Your context card has been updated successfully!');
+      
+      // Clear any success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+      
+    } catch (error: Error | unknown) {
+      console.error('Error updating context card:', error);
+      if (error instanceof Error && error.message && error.message.includes('Network error')) {
+        setError('Could not connect to the server. Please check your connection and try again.');
+      } else {
+        setError('Failed to update your context card. Please try again.');
+      }
+      
+      // Clear any error message after 3 seconds
+      setTimeout(() => {
+        setError('');
+      }, 3000);
+    }
+  };
+
+  const handleDeleteContextCard = async (id: string) => {
+    setError('');
+    setSuccessMessage('');
+    
+    try {
+      const response = await fetch(`/api/context-cards/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response) {
+        throw new Error('Network error: Could not connect to the server');
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error('Invalid response from server');
+      }
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to delete card');
+      }
+
+      // Remove the card from the state
+      setContextCards(contextCards.filter(card => card.id !== id));
+      
+      setSuccessMessage('Your context card has been deleted successfully!');
+      
+      // Clear any success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+      
+    } catch (error: Error | unknown) {
+      console.error('Error deleting context card:', error);
+      if (error instanceof Error && error.message && error.message.includes('Network error')) {
+        setError('Could not connect to the server. Please check your connection and try again.');
+      } else {
+        setError('Failed to delete your context card. Please try again.');
+      }
+      
+      // Clear any error message after 3 seconds
+      setTimeout(() => {
+        setError('');
+      }, 3000);
     }
   };
 
@@ -175,37 +313,101 @@ export default function EncyclopediaPage() {
                 )}
               </div>
 
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Add context for your plant chatbot here"
-                rows={20}
-                className="w-full px-6 py-4 text-lg bg-gray-800 border border-purple-900/30 rounded-xl 
-                         text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
-                         focus:ring-purple-600/50 focus:border-transparent transition-all
-                         shadow-lg hover:shadow-purple-900/5 resize-none"
-              />
-              {error && (
-                <p className="mt-2 text-red-400 text-sm">{error}</p>
-              )}
-              {successMessage && (
-                <p className="mt-2 text-green-400 text-sm">{successMessage}</p>
-              )}
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !text.trim()}
-                className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-lg font-medium
-                         hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500
-                         focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50
-                         disabled:cursor-not-allowed transition-all"
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="inline-block animate-spin mr-2">⟳</span>
-                    Saving...
-                  </>
-                ) : 'Submit'}
-              </button>
+              {/* Context Cards Section */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-purple-100">Context Cards</h2>
+                  <button
+                    onClick={() => setIsCreating(true)}
+                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium
+                           hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isCreating}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1" />
+                    Add Card
+                  </button>
+                </div>
+                
+                {error && (
+                  <p className="mb-4 text-red-400 text-sm">{error}</p>
+                )}
+                
+                {successMessage && (
+                  <p className="mb-4 text-green-400 text-sm">{successMessage}</p>
+                )}
+                
+                {/* Create new card form */}
+                {isCreating && (
+                  <div className="mb-4 bg-gray-800 border border-purple-900/30 rounded-xl shadow-lg overflow-hidden">
+                    <div className="p-4">
+                      <h3 className="text-xl font-semibold text-purple-100 mb-3">Create a New Context Card</h3>
+                      <input
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        className="w-full px-3 py-2 mb-3 text-lg bg-gray-700 border border-purple-900/30 rounded-lg 
+                                text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
+                                focus:ring-purple-600/50 focus:border-transparent"
+                        placeholder="Card Title"
+                      />
+                      <textarea
+                        value={newContent}
+                        onChange={(e) => setNewContent(e.target.value)}
+                        rows={6}
+                        className="w-full px-3 py-2 mb-3 text-base bg-gray-700 border border-purple-900/30 rounded-lg 
+                                  text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
+                                  focus:ring-purple-600/50 focus:border-transparent resize-none"
+                        placeholder="Card Content"
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => setIsCreating(false)}
+                          className="px-3 py-1 bg-gray-700 text-gray-300 rounded-lg text-sm font-medium
+                                hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleCreateContextCard}
+                          disabled={isSubmitting || !newTitle.trim() || !newContent.trim()}
+                          className="px-3 py-1 bg-purple-600 text-white rounded-lg text-sm font-medium
+                                hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <span className="inline-block animate-spin mr-1">⟳</span>
+                              Saving...
+                            </>
+                          ) : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Display context cards */}
+                {contextCards.length > 0 ? (
+                  contextCards.map(card => (
+                    <ContextCard
+                      key={card.id}
+                      id={card.id}
+                      title={card.title}
+                      content={card.content}
+                      onUpdate={handleUpdateContextCard}
+                      onDelete={handleDeleteContextCard}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    {isCreating ? (
+                      <p>Create your first context card above!</p>
+                    ) : (
+                      <p>No context cards yet. Click &apos;Add Card&apos; to create your first one!</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

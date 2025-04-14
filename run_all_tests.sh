@@ -119,9 +119,50 @@ run_chat_api_tests() {
     deactivate
 }
 
+# Test Docker build
+test_docker_build() {
+    print_header "Testing Docker Build"
+    
+    echo "Building frontend container..."
+    # Run the build for the frontend service with full output
+    if docker-compose build frontend; then
+        print_success "Frontend build succeeded"
+    else
+        print_error "Frontend build failed. See error above."
+        FAILURES=$((FAILURES+1))
+        return 1
+    fi
+    
+    echo "Building gardenbook-db-api container..."
+    if docker-compose build gardenbook-db-api; then
+        print_success "DB API build succeeded"
+    else
+        print_error "DB API build failed. See error above."
+        FAILURES=$((FAILURES+1))
+        return 1
+    fi
+    
+    echo "Building gardenbook-chat-api container..."
+    if docker-compose build gardenbook-chat-api; then
+        print_success "Chat API build succeeded"
+    else
+        print_error "Chat API build failed. See error above."
+        FAILURES=$((FAILURES+1))
+        return 1
+    fi
+    
+    return 0
+}
+
 # Run system integration tests
 run_system_tests() {
     print_header "Running System Integration Tests"
+    
+    # First, test if all Docker builds succeed
+    if ! test_docker_build; then
+        print_error "Docker build failed. Skipping system tests."
+        return 1
+    fi
     
     # Make the test script executable
     chmod +x test_gardenbook.py
