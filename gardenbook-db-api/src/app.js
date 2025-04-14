@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const plantRoutes = require('./routes/plants');
+const userRoutes = require('./routes/users');
 
 const app = express();
 
@@ -37,5 +38,8 @@ app.use('/api', apiRouter);
 
 // Plant routes
 apiRouter.use('/plants', plantRoutes);
+
+// User routes
+apiRouter.use('/users', userRoutes);
 
 module.exports = app; 
