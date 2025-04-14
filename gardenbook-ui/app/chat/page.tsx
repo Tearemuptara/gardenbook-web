@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Message {
   content: string;
@@ -12,6 +12,12 @@ interface ChatMessage {
   content: string;
 }
 
+interface ChatRequestBody {
+  messages: ChatMessage[];
+  userId: string;
+  user_timezone?: string;
+}
+
 // Default user ID - in a real app, this would come from authentication
 const DEFAULT_USER_ID = '507f1f77bcf86cd799439011';
 
@@ -19,6 +25,18 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [userTimezone, setUserTimezone] = useState<string | null>(null);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+
+  // Load timezone from localStorage when the component mounts
+  useEffect(() => {
+    const storedLocationEnabled = localStorage.getItem('locationEnabled');
+    if (storedLocationEnabled === 'true') {
+      setLocationEnabled(true);
+      const storedTimezone = localStorage.getItem('userTimezone');
+      setUserTimezone(storedTimezone);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,16 +55,24 @@ export default function ChatPage() {
         content: msg.content
       }));
 
-      // Call the API with userId
+      // Prepare the request body
+      const requestBody: ChatRequestBody = {
+        messages: apiMessages,
+        userId: DEFAULT_USER_ID
+      };
+
+      // Add timezone if available and location is enabled
+      if (locationEnabled && userTimezone) {
+        requestBody.user_timezone = userTimezone;
+      }
+
+      // Call the API
       const response = await fetch('http://localhost:5000/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          messages: apiMessages,
-          userId: DEFAULT_USER_ID // Include the userId
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -76,6 +102,19 @@ export default function ChatPage() {
     <div className="h-screen w-screen bg-gray-900">
       <div className="flex flex-col h-full bg-gray-900 border border-purple-900/50 pr-24">
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900">
+          {messages.length === 0 && (
+            <div className="flex justify-center items-center h-full text-purple-300/50">
+              <div className="text-center p-8 bg-gray-800/50 rounded-xl border border-purple-900/20 max-w-md">
+                <h2 className="text-xl font-semibold mb-3">Welcome to Gardenbook Chat</h2>
+                <p className="mb-4">Ask me anything about your plants and garden!</p>
+                {locationEnabled && userTimezone && (
+                  <p className="text-sm text-green-400">
+                    Using your timezone: {userTimezone}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           {messages.map((message, index) => (
             <div
               key={index}

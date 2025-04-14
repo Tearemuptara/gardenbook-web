@@ -6,6 +6,7 @@ langgraph
 langchain-mcp-adapters
 python-dotenv
 pymongo
+pytz
 # Testing dependencies
 pytest
 pytest-asyncio

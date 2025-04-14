@@ -9,7 +9,17 @@ export default function EncyclopediaPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationStatus, setLocationStatus] = useState('');
   const router = useRouter();
+
+  // Check if location is already enabled in localStorage
+  useEffect(() => {
+    const storedLocationEnabled = localStorage.getItem('locationEnabled');
+    if (storedLocationEnabled === 'true') {
+      setLocationEnabled(true);
+    }
+  }, []);
 
   // Fetch existing encyclopedia data when the page loads
   useEffect(() => {
@@ -88,6 +98,43 @@ export default function EncyclopediaPage() {
     }
   };
 
+  const handleLocationToggle = () => {
+    if (!locationEnabled) {
+      // Request location permission
+      if (navigator.geolocation) {
+        setLocationStatus('Requesting location permission...');
+        navigator.geolocation.getCurrentPosition(
+          () => {
+            // Successfully got location
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            
+            // Store timezone in localStorage for later use
+            localStorage.setItem('userTimezone', timezone);
+            localStorage.setItem('locationEnabled', 'true');
+            
+            setLocationEnabled(true);
+            setLocationStatus(`Location enabled. Your timezone is: ${timezone}`);
+          },
+          (error) => {
+            // Failed to get location
+            console.error('Error getting location:', error);
+            setLocationStatus('Could not access your location. Please check browser permissions.');
+            setLocationEnabled(false);
+            localStorage.setItem('locationEnabled', 'false');
+          }
+        );
+      } else {
+        setLocationStatus('Geolocation is not supported by your browser.');
+      }
+    } else {
+      // Disable location
+      localStorage.removeItem('userTimezone');
+      localStorage.setItem('locationEnabled', 'false');
+      setLocationEnabled(false);
+      setLocationStatus('Location access disabled.');
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-gray-900">
       <div className="p-8 max-w-6xl mx-auto">
@@ -103,6 +150,31 @@ export default function EncyclopediaPage() {
             </div>
           ) : (
             <>
+              <div className="mb-6 p-4 bg-gray-800 border border-purple-900/30 rounded-xl shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-purple-100">Location Settings</h2>
+                    <p className="text-gray-400 text-sm mt-1">
+                      Allow the chatbot to know your timezone for season-appropriate advice
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={locationEnabled}
+                      onChange={handleLocationToggle}
+                    />
+                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+                {locationStatus && (
+                  <p className={`mt-2 text-sm ${locationEnabled ? 'text-green-400' : 'text-gray-400'}`}>
+                    {locationStatus}
+                  </p>
+                )}
+              </div>
+
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
