@@ -1,23 +1,20 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import ContextCard from '../components/ContextCard';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
-// Type definition for context card data
-interface ContextCard {
+// Type definition for context entry data
+interface ContextEntry {
   id: string;
-  title: string;
   content: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export default function EncyclopediaPage() {
-  const [contextCards, setContextCards] = useState<ContextCard[]>([]);
+  const [contextEntries, setContextEntries] = useState<ContextEntry[]>([]);
   const [isCreating, setIsCreating] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,7 +22,6 @@ export default function EncyclopediaPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
-  const router = useRouter();
 
   // Check if location is already enabled in localStorage
   useEffect(() => {
@@ -35,12 +31,36 @@ export default function EncyclopediaPage() {
     }
   }, []);
 
-  // Fetch existing context cards when the page loads
+  // Helper function to update encyclopedia with all context entries
+  const updateEncyclopedia = async (entries: ContextEntry[]) => {
+    // Format all entries into a single string for the encyclopedia
+    const encyclopediaText = entries.length > 0 
+      ? entries.map(entry => entry.content).join('\n\n---\n\n')
+      : " "; // Use space instead of empty string to avoid API validation errors
+    
+    try {
+      const response = await fetch('/api/encyclopedia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: encyclopediaText }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to update encyclopedia:', await response.json());
+      }
+    } catch (error) {
+      console.error('Error updating encyclopedia:', error);
+    }
+  };
+
+  // Fetch existing context entries when the page loads
   useEffect(() => {
-    const fetchContextCards = async () => {
+    const fetchContextEntries = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/context-cards');
+        const response = await fetch('/api/encyclopedia');
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -49,23 +69,36 @@ export default function EncyclopediaPage() {
         
         const result = await response.json();
         
-        if (result.success && result.data && result.data.contextCards) {
-          setContextCards(result.data.contextCards);
+        if (result.success && result.data && result.data.encyclopedia) {
+          // Parse the encyclopedia text into separate context entries
+          const encyclopediaText = result.data.encyclopedia.trim();
+          
+          if (encyclopediaText && encyclopediaText !== " ") {
+            const entries = encyclopediaText.split('\n\n---\n\n').map((content: string, index: number) => ({
+              id: `local-${Date.now()}-${index}`,
+              content: content.trim(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }));
+            setContextEntries(entries);
+          } else {
+            setContextEntries([]);
+          }
         }
       } catch (error: Error | unknown) {
-        console.error('Error loading context cards:', error);
+        console.error('Error loading encyclopedia:', error);
         setError('Failed to load existing data. The server might be unavailable.');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchContextCards();
+    fetchContextEntries();
   }, []);
 
-  const handleCreateContextCard = async () => {
-    if (!newTitle.trim() || !newContent.trim()) {
-      setError('Please enter both a title and content for the new card');
+  const handleCreateContextEntry = async () => {
+    if (!newContent.trim()) {
+      setError('Please enter content for the new context');
       return;
     }
     
@@ -74,57 +107,39 @@ export default function EncyclopediaPage() {
     setSuccessMessage('');
     
     try {
-      const response = await fetch('/api/context-cards', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          title: newTitle,
-          content: newContent
-        }),
-      });
-
-      if (!response) {
-        throw new Error('Network error: Could not connect to the server');
-      }
-
-      let result;
-      try {
-        result = await response.json();
-      } catch {
-        throw new Error('Invalid response from server');
-      }
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to create card');
-      }
-
-      // Add the new card to the state
-      if (result.data && result.data.contextCard) {
-        setContextCards([...contextCards, result.data.contextCard]);
-      }
+      // Create a new entry with local ID
+      const newEntry: ContextEntry = {
+        id: `local-${Date.now()}`,
+        content: newContent,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
       
-      setSuccessMessage('Your context card has been added successfully!');
-      setNewTitle('');
+      // Add to state
+      const updatedEntries = [...contextEntries, newEntry];
+      setContextEntries(updatedEntries);
+      
+      // Update encyclopedia with all entries
+      await updateEncyclopedia(updatedEntries);
+      
+      setSuccessMessage('Your context has been added successfully!');
       setNewContent('');
       setIsCreating(false);
-      router.refresh();
     } catch (error: Error | unknown) {
-      console.error('Error creating context card:', error);
+      console.error('Error creating context:', error);
       if (error instanceof Error && error.message && error.message.includes('Network error')) {
         setError('Could not connect to the server. Please check your connection and try again.');
       } else {
-        setError('Failed to create your context card. Please try again.');
+        setError('Failed to create your context. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleUpdateContextCard = async (id: string, title: string, content: string) => {
-    if (!title.trim() || !content.trim()) {
-      setError('Please enter both a title and content for the card');
+  const handleUpdateContextEntry = async (id: string, content: string) => {
+    if (!content.trim()) {
+      setError('Please enter content for the context');
       return;
     }
     
@@ -132,49 +147,30 @@ export default function EncyclopediaPage() {
     setSuccessMessage('');
     
     try {
-      const response = await fetch(`/api/context-cards/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title, content }),
-      });
-
-      if (!response) {
-        throw new Error('Network error: Could not connect to the server');
-      }
-
-      let result;
-      try {
-        result = await response.json();
-      } catch {
-        throw new Error('Invalid response from server');
-      }
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to update card');
-      }
-
-      // Update the card in the state
-      if (result.data && result.data.contextCard) {
-        setContextCards(contextCards.map(card => 
-          card.id === id ? result.data.contextCard : card
-        ));
-      }
+      // Update the entry in state
+      const updatedEntries = contextEntries.map(entry => 
+        entry.id === id 
+          ? { ...entry, content, updatedAt: new Date().toISOString() } 
+          : entry
+      );
       
-      setSuccessMessage('Your context card has been updated successfully!');
+      setContextEntries(updatedEntries);
+      
+      // Update encyclopedia with all entries
+      await updateEncyclopedia(updatedEntries);
+      
+      setSuccessMessage('Your context has been updated successfully!');
       
       // Clear any success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
-      
     } catch (error: Error | unknown) {
-      console.error('Error updating context card:', error);
+      console.error('Error updating context:', error);
       if (error instanceof Error && error.message && error.message.includes('Network error')) {
         setError('Could not connect to the server. Please check your connection and try again.');
       } else {
-        setError('Failed to update your context card. Please try again.');
+        setError('Failed to update your context. Please try again.');
       }
       
       // Clear any error message after 3 seconds
@@ -184,49 +180,30 @@ export default function EncyclopediaPage() {
     }
   };
 
-  const handleDeleteContextCard = async (id: string) => {
+  const handleDeleteContextEntry = async (id: string) => {
     setError('');
     setSuccessMessage('');
     
     try {
-      const response = await fetch(`/api/context-cards/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response) {
-        throw new Error('Network error: Could not connect to the server');
-      }
-
-      let result;
-      try {
-        result = await response.json();
-      } catch {
-        throw new Error('Invalid response from server');
-      }
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to delete card');
-      }
-
-      // Remove the card from the state
-      setContextCards(contextCards.filter(card => card.id !== id));
+      // Remove the entry from state
+      const updatedEntries = contextEntries.filter(entry => entry.id !== id);
+      setContextEntries(updatedEntries);
       
-      setSuccessMessage('Your context card has been deleted successfully!');
+      // Update encyclopedia with remaining entries
+      await updateEncyclopedia(updatedEntries);
+      
+      setSuccessMessage('Your context has been deleted successfully!');
       
       // Clear any success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
-      
     } catch (error: Error | unknown) {
-      console.error('Error deleting context card:', error);
+      console.error('Error deleting context:', error);
       if (error instanceof Error && error.message && error.message.includes('Network error')) {
         setError('Could not connect to the server. Please check your connection and try again.');
       } else {
-        setError('Failed to delete your context card. Please try again.');
+        setError('Failed to delete your context. Please try again.');
       }
       
       // Clear any error message after 3 seconds
@@ -313,10 +290,10 @@ export default function EncyclopediaPage() {
                 )}
               </div>
 
-              {/* Context Cards Section */}
+              {/* Context Section */}
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-purple-100">Context Cards</h2>
+                  <h2 className="text-xl font-semibold text-purple-100">Chatbot Context</h2>
                   <button
                     onClick={() => setIsCreating(true)}
                     className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium
@@ -325,7 +302,7 @@ export default function EncyclopediaPage() {
                     disabled={isCreating}
                   >
                     <PlusIcon className="h-4 w-4 mr-1" />
-                    Add Card
+                    Add Context
                   </button>
                 </div>
                 
@@ -337,19 +314,11 @@ export default function EncyclopediaPage() {
                   <p className="mb-4 text-green-400 text-sm">{successMessage}</p>
                 )}
                 
-                {/* Create new card form */}
+                {/* Create new context form */}
                 {isCreating && (
                   <div className="mb-4 bg-gray-800 border border-purple-900/30 rounded-xl shadow-lg overflow-hidden">
                     <div className="p-4">
-                      <h3 className="text-xl font-semibold text-purple-100 mb-3">Create a New Context Card</h3>
-                      <input
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        className="w-full px-3 py-2 mb-3 text-lg bg-gray-700 border border-purple-900/30 rounded-lg 
-                                text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
-                                focus:ring-purple-600/50 focus:border-transparent"
-                        placeholder="Card Title"
-                      />
+                      <h3 className="text-xl font-semibold text-purple-100 mb-3">Create New Context</h3>
                       <textarea
                         value={newContent}
                         onChange={(e) => setNewContent(e.target.value)}
@@ -357,7 +326,7 @@ export default function EncyclopediaPage() {
                         className="w-full px-3 py-2 mb-3 text-base bg-gray-700 border border-purple-900/30 rounded-lg 
                                   text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
                                   focus:ring-purple-600/50 focus:border-transparent resize-none"
-                        placeholder="Card Content"
+                        placeholder="Enter gardening information you'd like the chatbot to remember..."
                       />
                       <div className="flex justify-end space-x-2">
                         <button
@@ -368,8 +337,8 @@ export default function EncyclopediaPage() {
                           Cancel
                         </button>
                         <button
-                          onClick={handleCreateContextCard}
-                          disabled={isSubmitting || !newTitle.trim() || !newContent.trim()}
+                          onClick={handleCreateContextEntry}
+                          disabled={isSubmitting || !newContent.trim()}
                           className="px-3 py-1 bg-purple-600 text-white rounded-lg text-sm font-medium
                                 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500
                                 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -386,24 +355,23 @@ export default function EncyclopediaPage() {
                   </div>
                 )}
                 
-                {/* Display context cards */}
-                {contextCards.length > 0 ? (
-                  contextCards.map(card => (
+                {/* Display context entries */}
+                {contextEntries.length > 0 ? (
+                  contextEntries.map(entry => (
                     <ContextCard
-                      key={card.id}
-                      id={card.id}
-                      title={card.title}
-                      content={card.content}
-                      onUpdate={handleUpdateContextCard}
-                      onDelete={handleDeleteContextCard}
+                      key={entry.id}
+                      id={entry.id}
+                      content={entry.content}
+                      onUpdate={handleUpdateContextEntry}
+                      onDelete={handleDeleteContextEntry}
                     />
                   ))
                 ) : (
                   <div className="text-center py-8 text-gray-400">
                     {isCreating ? (
-                      <p>Create your first context card above!</p>
+                      <p>Create your first context entry above!</p>
                     ) : (
-                      <p>No context cards yet. Click &apos;Add Card&apos; to create your first one!</p>
+                      <p>No context entries yet. Click &apos;Add Context&apos; to create your first one!</p>
                     )}
                   </div>
                 )}

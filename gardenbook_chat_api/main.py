@@ -67,34 +67,16 @@ async def chat(chat_request: ChatRequest):
                 # In Docker environment, use service name; otherwise use localhost
                 api_url = os.getenv("NODE_API_URL", "http://gardenbook-db-api:3001")
                 
-                # Try to fetch context cards first
-                context_cards_response = requests.get(f"{api_url}/api/users/{chat_request.userId}/context-cards")
-                
-                if context_cards_response.status_code == 200:
-                    context_cards = context_cards_response.json().get("contextCards", [])
-                    if context_cards and len(context_cards) > 0:
-                        # Format context cards into a single string
-                        encyclopedia_data = "\n\n".join([
-                            f"--- {card.get('title', 'Untitled')} ---\n{card.get('content', '')}"
-                            for card in context_cards
-                        ])
-                        print(f"Successfully fetched {len(context_cards)} context cards for user {chat_request.userId}")
-                    else:
-                        # Fall back to encyclopedia if no context cards found
-                        encyclopedia_response = requests.get(f"{api_url}/api/users/{chat_request.userId}/encyclopedia")
-                        if encyclopedia_response.status_code == 200:
-                            encyclopedia_data = encyclopedia_response.json().get("encyclopedia", "")
-                            print(f"Successfully fetched encyclopedia data for user {chat_request.userId}")
-                        else:
-                            print(f"Failed to fetch encyclopedia data: {encyclopedia_response.status_code}, {encyclopedia_response.text}")
-                else:
-                    # Fall back to encyclopedia if context cards endpoint fails
-                    encyclopedia_response = requests.get(f"{api_url}/api/users/{chat_request.userId}/encyclopedia")
-                    if encyclopedia_response.status_code == 200:
-                        encyclopedia_data = encyclopedia_response.json().get("encyclopedia", "")
+                # Get encyclopedia data directly
+                encyclopedia_response = requests.get(f"{api_url}/api/users/{chat_request.userId}/encyclopedia")
+                if encyclopedia_response.status_code == 200:
+                    encyclopedia_data = encyclopedia_response.json().get("encyclopedia", "")
+                    if encyclopedia_data and encyclopedia_data.strip() != " ":
                         print(f"Successfully fetched encyclopedia data for user {chat_request.userId}")
                     else:
-                        print(f"Failed to fetch encyclopedia data: {encyclopedia_response.status_code}, {encyclopedia_response.text}")
+                        print(f"Encyclopedia data is empty for user {chat_request.userId}")
+                else:
+                    print(f"Failed to fetch encyclopedia data: {encyclopedia_response.status_code}, {encyclopedia_response.text}")
             except Exception as e:
                 print(f"Error fetching context data: {str(e)}")
                 # Continue with the chat even if encyclopedia data can't be fetched

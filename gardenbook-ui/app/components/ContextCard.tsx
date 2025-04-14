@@ -5,16 +5,14 @@ import { ChevronDownIcon, ChevronUpIcon, PencilIcon, TrashIcon } from '@heroicon
 
 interface ContextCardProps {
   id: string;
-  title: string;
   content: string;
-  onUpdate: (id: string, title: string, content: string) => void;
+  onUpdate: (id: string, content: string) => void;
   onDelete: (id: string) => void;
 }
 
-export default function ContextCard({ id, title, content, onUpdate, onDelete }: ContextCardProps) {
+export default function ContextCard({ id, content, onUpdate, onDelete }: ContextCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(title);
   const [editContent, setEditContent] = useState(content);
 
   const handleToggleExpand = () => {
@@ -28,18 +26,17 @@ export default function ContextCard({ id, title, content, onUpdate, onDelete }: 
 
   const handleCancel = () => {
     setIsEditing(false);
-    setEditTitle(title);
     setEditContent(content);
   };
 
   const handleSave = () => {
-    onUpdate(id, editTitle, editContent);
+    onUpdate(id, editContent);
     setIsEditing(false);
     // Keep expanded to show the changes
   };
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this context card?')) {
+    if (confirm('Are you sure you want to delete this context?')) {
       onDelete(id);
     }
   };
@@ -49,14 +46,6 @@ export default function ContextCard({ id, title, content, onUpdate, onDelete }: 
       <div className="p-4">
         {isEditing ? (
           <div>
-            <input
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="w-full px-3 py-2 mb-3 text-lg bg-gray-700 border border-purple-900/30 rounded-lg 
-                    text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
-                    focus:ring-purple-600/50 focus:border-transparent"
-              placeholder="Card Title"
-            />
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
@@ -64,7 +53,7 @@ export default function ContextCard({ id, title, content, onUpdate, onDelete }: 
               className="w-full px-3 py-2 mb-3 text-base bg-gray-700 border border-purple-900/30 rounded-lg 
                       text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
                       focus:ring-purple-600/50 focus:border-transparent resize-none"
-              placeholder="Card Content"
+              placeholder="Context Content"
             />
             <div className="flex justify-end space-x-2">
               <button
@@ -85,32 +74,37 @@ export default function ContextCard({ id, title, content, onUpdate, onDelete }: 
           </div>
         ) : (
           <>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <div 
-                className="flex-1 cursor-pointer" 
+                className={`flex-1 cursor-pointer ${!isExpanded ? "line-clamp-3 relative" : ""}`} 
                 onClick={handleToggleExpand}
               >
-                <h3 className="text-xl font-semibold text-purple-100 pr-2">{title}</h3>
+                <p className="text-gray-300 whitespace-pre-wrap">
+                  {content}
+                </p>
+                {!isExpanded && (
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-gray-800 to-transparent"></div>
+                )}
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 ml-2">
                 <button
                   onClick={handleEdit}
                   className="p-1 text-gray-400 hover:text-purple-300 focus:outline-none"
-                  aria-label="Edit card"
+                  aria-label="Edit context"
                 >
                   <PencilIcon className="h-5 w-5" />
                 </button>
                 <button
                   onClick={handleDelete}
                   className="p-1 text-gray-400 hover:text-red-500 focus:outline-none"
-                  aria-label="Delete card"
+                  aria-label="Delete context"
                 >
                   <TrashIcon className="h-5 w-5" />
                 </button>
                 <button
                   onClick={handleToggleExpand}
                   className="p-1 text-gray-400 hover:text-purple-300 focus:outline-none"
-                  aria-label={isExpanded ? "Collapse card" : "Expand card"}
+                  aria-label={isExpanded ? "Collapse context" : "Expand context"}
                 >
                   {isExpanded ? (
                     <ChevronUpIcon className="h-5 w-5" />
@@ -120,11 +114,6 @@ export default function ContextCard({ id, title, content, onUpdate, onDelete }: 
                 </button>
               </div>
             </div>
-            {isExpanded && (
-              <div className="mt-3 text-gray-300 whitespace-pre-wrap">
-                {content}
-              </div>
-            )}
           </>
         )}
       </div>
