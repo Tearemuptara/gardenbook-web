@@ -56,8 +56,10 @@ The API will be available at http://localhost:8000 with documentation at http://
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "What plants are in the database?"}], "mcp_server_path": "../plants-mcp/garden_mcp.py"}'
+  -d '{"messages": [{"role": "user", "content": "What plants are in the database?"}], "userId": "507f1f77bcf86cd799439011"}'
 ```
+
+The `userId` parameter is optional. When provided, the API will fetch the user's encyclopedia data from the database API and include it in the chat context. This allows the chat assistant to provide personalized responses based on the user's gardening context.
 
 ## Project Structure
 

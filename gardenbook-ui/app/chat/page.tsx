@@ -12,6 +12,9 @@ interface ChatMessage {
   content: string;
 }
 
+// Default user ID - in a real app, this would come from authentication
+const DEFAULT_USER_ID = '507f1f77bcf86cd799439011';
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -34,13 +37,16 @@ export default function ChatPage() {
         content: msg.content
       }));
 
-      // Call the API
+      // Call the API with userId
       const response = await fetch('http://localhost:5000/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ 
+          messages: apiMessages,
+          userId: DEFAULT_USER_ID // Include the userId
+        }),
       });
 
       if (!response.ok) {

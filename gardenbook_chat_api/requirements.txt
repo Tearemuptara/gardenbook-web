@@ -7,4 +7,5 @@ langchain-ollama
 langgraph
 langchain-mcp-adapters
 python-dotenv
-pymongo 
+pymongo
+requests 
