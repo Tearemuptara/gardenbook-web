@@ -1,17 +1,27 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import ContextCard from '../components/ContextCard';
+import { PlusIcon } from '@heroicons/react/24/outline';
+
+// Type definition for context entry data
+interface ContextEntry {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function EncyclopediaPage() {
-  const [text, setText] = useState('');
+  const [contextEntries, setContextEntries] = useState<ContextEntry[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newContent, setNewContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
-  const router = useRouter();
 
   // Check if location is already enabled in localStorage
   useEffect(() => {
@@ -21,9 +31,33 @@ export default function EncyclopediaPage() {
     }
   }, []);
 
-  // Fetch existing encyclopedia data when the page loads
+  // Helper function to update encyclopedia with all context entries
+  const updateEncyclopedia = async (entries: ContextEntry[]) => {
+    // Format all entries into a single string for the encyclopedia
+    const encyclopediaText = entries.length > 0 
+      ? entries.map(entry => entry.content).join('\n\n---\n\n')
+      : " "; // Use space instead of empty string to avoid API validation errors
+    
+    try {
+      const response = await fetch('/api/encyclopedia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: encyclopediaText }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to update encyclopedia:', await response.json());
+      }
+    } catch (error) {
+      console.error('Error updating encyclopedia:', error);
+    }
+  };
+
+  // Fetch existing context entries when the page loads
   useEffect(() => {
-    const fetchEncyclopediaData = async () => {
+    const fetchContextEntries = async () => {
       setIsLoading(true);
       try {
         const response = await fetch('/api/encyclopedia');
@@ -36,22 +70,35 @@ export default function EncyclopediaPage() {
         const result = await response.json();
         
         if (result.success && result.data && result.data.encyclopedia) {
-          setText(result.data.encyclopedia);
+          // Parse the encyclopedia text into separate context entries
+          const encyclopediaText = result.data.encyclopedia.trim();
+          
+          if (encyclopediaText && encyclopediaText !== " ") {
+            const entries = encyclopediaText.split('\n\n---\n\n').map((content: string, index: number) => ({
+              id: `local-${Date.now()}-${index}`,
+              content: content.trim(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }));
+            setContextEntries(entries);
+          } else {
+            setContextEntries([]);
+          }
         }
       } catch (error: Error | unknown) {
-        console.error('Error loading encyclopedia data:', error);
-        setError('Failed to load existing data. The server might be unavailable. You can still add new information.');
+        console.error('Error loading encyclopedia:', error);
+        setError('Failed to load existing data. The server might be unavailable.');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchEncyclopediaData();
+    fetchContextEntries();
   }, []);
 
-  const handleSubmit = async () => {
-    if (!text.trim()) {
-      setError('Please enter some text before submitting');
+  const handleCreateContextEntry = async () => {
+    if (!newContent.trim()) {
+      setError('Please enter content for the new context');
       return;
     }
     
@@ -60,41 +107,109 @@ export default function EncyclopediaPage() {
     setSuccessMessage('');
     
     try {
-      const response = await fetch('/api/encyclopedia', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      // Handle network errors
-      if (!response) {
-        throw new Error('Network error: Could not connect to the server');
-      }
-
-      let result;
-      try {
-        result = await response.json();
-      } catch {
-        throw new Error('Invalid response from server');
-      }
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to submit');
-      }
-
-      setSuccessMessage('Your gardening information has been saved successfully!');
-      router.refresh();
+      // Create a new entry with local ID
+      const newEntry: ContextEntry = {
+        id: `local-${Date.now()}`,
+        content: newContent,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Add to state
+      const updatedEntries = [...contextEntries, newEntry];
+      setContextEntries(updatedEntries);
+      
+      // Update encyclopedia with all entries
+      await updateEncyclopedia(updatedEntries);
+      
+      setSuccessMessage('Your context has been added successfully!');
+      setNewContent('');
+      setIsCreating(false);
     } catch (error: Error | unknown) {
-      console.error('Error submitting:', error);
+      console.error('Error creating context:', error);
       if (error instanceof Error && error.message && error.message.includes('Network error')) {
         setError('Could not connect to the server. Please check your connection and try again.');
       } else {
-        setError('Failed to save your information. Please try again.');
+        setError('Failed to create your context. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateContextEntry = async (id: string, content: string) => {
+    if (!content.trim()) {
+      setError('Please enter content for the context');
+      return;
+    }
+    
+    setError('');
+    setSuccessMessage('');
+    
+    try {
+      // Update the entry in state
+      const updatedEntries = contextEntries.map(entry => 
+        entry.id === id 
+          ? { ...entry, content, updatedAt: new Date().toISOString() } 
+          : entry
+      );
+      
+      setContextEntries(updatedEntries);
+      
+      // Update encyclopedia with all entries
+      await updateEncyclopedia(updatedEntries);
+      
+      setSuccessMessage('Your context has been updated successfully!');
+      
+      // Clear any success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    } catch (error: Error | unknown) {
+      console.error('Error updating context:', error);
+      if (error instanceof Error && error.message && error.message.includes('Network error')) {
+        setError('Could not connect to the server. Please check your connection and try again.');
+      } else {
+        setError('Failed to update your context. Please try again.');
+      }
+      
+      // Clear any error message after 3 seconds
+      setTimeout(() => {
+        setError('');
+      }, 3000);
+    }
+  };
+
+  const handleDeleteContextEntry = async (id: string) => {
+    setError('');
+    setSuccessMessage('');
+    
+    try {
+      // Remove the entry from state
+      const updatedEntries = contextEntries.filter(entry => entry.id !== id);
+      setContextEntries(updatedEntries);
+      
+      // Update encyclopedia with remaining entries
+      await updateEncyclopedia(updatedEntries);
+      
+      setSuccessMessage('Your context has been deleted successfully!');
+      
+      // Clear any success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    } catch (error: Error | unknown) {
+      console.error('Error deleting context:', error);
+      if (error instanceof Error && error.message && error.message.includes('Network error')) {
+        setError('Could not connect to the server. Please check your connection and try again.');
+      } else {
+        setError('Failed to delete your context. Please try again.');
+      }
+      
+      // Clear any error message after 3 seconds
+      setTimeout(() => {
+        setError('');
+      }, 3000);
     }
   };
 
@@ -175,37 +290,92 @@ export default function EncyclopediaPage() {
                 )}
               </div>
 
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Add context for your plant chatbot here"
-                rows={20}
-                className="w-full px-6 py-4 text-lg bg-gray-800 border border-purple-900/30 rounded-xl 
-                         text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
-                         focus:ring-purple-600/50 focus:border-transparent transition-all
-                         shadow-lg hover:shadow-purple-900/5 resize-none"
-              />
-              {error && (
-                <p className="mt-2 text-red-400 text-sm">{error}</p>
-              )}
-              {successMessage && (
-                <p className="mt-2 text-green-400 text-sm">{successMessage}</p>
-              )}
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !text.trim()}
-                className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-lg font-medium
-                         hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500
-                         focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50
-                         disabled:cursor-not-allowed transition-all"
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="inline-block animate-spin mr-2">⟳</span>
-                    Saving...
-                  </>
-                ) : 'Submit'}
-              </button>
+              {/* Context Section */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-purple-100">Chatbot Context</h2>
+                  <button
+                    onClick={() => setIsCreating(true)}
+                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium
+                           hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isCreating}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1" />
+                    Add Context
+                  </button>
+                </div>
+                
+                {error && (
+                  <p className="mb-4 text-red-400 text-sm">{error}</p>
+                )}
+                
+                {successMessage && (
+                  <p className="mb-4 text-green-400 text-sm">{successMessage}</p>
+                )}
+                
+                {/* Create new context form */}
+                {isCreating && (
+                  <div className="mb-4 bg-gray-800 border border-purple-900/30 rounded-xl shadow-lg overflow-hidden">
+                    <div className="p-4">
+                      <h3 className="text-xl font-semibold text-purple-100 mb-3">Create New Context</h3>
+                      <textarea
+                        value={newContent}
+                        onChange={(e) => setNewContent(e.target.value)}
+                        rows={6}
+                        className="w-full px-3 py-2 mb-3 text-base bg-gray-700 border border-purple-900/30 rounded-lg 
+                                  text-purple-100 placeholder-gray-500 focus:outline-none focus:ring-2 
+                                  focus:ring-purple-600/50 focus:border-transparent resize-none"
+                        placeholder="Enter gardening information you'd like the chatbot to remember..."
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => setIsCreating(false)}
+                          className="px-3 py-1 bg-gray-700 text-gray-300 rounded-lg text-sm font-medium
+                                hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleCreateContextEntry}
+                          disabled={isSubmitting || !newContent.trim()}
+                          className="px-3 py-1 bg-purple-600 text-white rounded-lg text-sm font-medium
+                                hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <span className="inline-block animate-spin mr-1">⟳</span>
+                              Saving...
+                            </>
+                          ) : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Display context entries */}
+                {contextEntries.length > 0 ? (
+                  contextEntries.map(entry => (
+                    <ContextCard
+                      key={entry.id}
+                      id={entry.id}
+                      content={entry.content}
+                      onUpdate={handleUpdateContextEntry}
+                      onDelete={handleDeleteContextEntry}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    {isCreating ? (
+                      <p>Create your first context entry above!</p>
+                    ) : (
+                      <p>No context entries yet. Click &apos;Add Context&apos; to create your first one!</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

@@ -66,15 +66,19 @@ async def chat(chat_request: ChatRequest):
             try:
                 # In Docker environment, use service name; otherwise use localhost
                 api_url = os.getenv("NODE_API_URL", "http://gardenbook-db-api:3001")
-                response = requests.get(f"{api_url}/api/users/{chat_request.userId}/encyclopedia")
                 
-                if response.status_code == 200:
-                    encyclopedia_data = response.json().get("encyclopedia", "")
-                    print(f"Successfully fetched encyclopedia data for user {chat_request.userId}")
+                # Get encyclopedia data directly
+                encyclopedia_response = requests.get(f"{api_url}/api/users/{chat_request.userId}/encyclopedia")
+                if encyclopedia_response.status_code == 200:
+                    encyclopedia_data = encyclopedia_response.json().get("encyclopedia", "")
+                    if encyclopedia_data and encyclopedia_data.strip() != " ":
+                        print(f"Successfully fetched encyclopedia data for user {chat_request.userId}")
+                    else:
+                        print(f"Encyclopedia data is empty for user {chat_request.userId}")
                 else:
-                    print(f"Failed to fetch encyclopedia data: {response.status_code}, {response.text}")
+                    print(f"Failed to fetch encyclopedia data: {encyclopedia_response.status_code}, {encyclopedia_response.text}")
             except Exception as e:
-                print(f"Error fetching encyclopedia data: {str(e)}")
+                print(f"Error fetching context data: {str(e)}")
                 # Continue with the chat even if encyclopedia data can't be fetched
         
         # Get user timezone if provided
