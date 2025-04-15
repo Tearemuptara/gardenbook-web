@@ -275,8 +275,8 @@ describe('User Model', () => {
       
       expect(mocks.findOne).toHaveBeenCalledWith({ email: 'user@example.com' });
       expect(mocks.updateOne).toHaveBeenCalled();
-      expect(result).toHaveProperty('resetToken');
-      expect(result).toHaveProperty('resetExpires');
+      expect(result).toHaveProperty('resetPasswordToken');
+      expect(result).toHaveProperty('resetPasswordExpires');
     });
     
     it('should return null if user not found', async () => {
