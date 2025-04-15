@@ -37,6 +37,11 @@
  *           type: string
  *           format: date-time
  *           description: Expiration date for password reset token
+ *         refreshTokens:
+ *           type: array
+ *           description: Array of refresh tokens for the user
+ *           items:
+ *             type: string
  *         role:
  *           type: string
  *           enum: [user, admin]
@@ -88,12 +93,17 @@
 
 const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 require('dotenv').config();
 
 // Email regex for validation
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 // Bcrypt salt rounds
 const SALT_ROUNDS = 10;
+// Password reset token expiry (in milliseconds) - 1 hour
+const PASSWORD_RESET_EXPIRY = 60 * 60 * 1000;
+// Maximum number of refresh tokens to store per user
+const MAX_REFRESH_TOKENS = 5;
 
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const client = new MongoClient(mongoUri);
@@ -164,6 +174,11 @@ const processUserData = async (userData) => {
       notifications: true
     };
   }
+
+  // Initialize refreshTokens array if not provided
+  if (!processedData.refreshTokens) {
+    processedData.refreshTokens = [];
+  }
   
   return processedData;
 };
@@ -216,6 +231,33 @@ const getUserById = async (id) => {
     };
   } catch (error) {
     console.error(`[getUserById] Error for id ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Get a user by email
+ * @param {string} email - User email
+ * @returns {Promise<Object|null>} User object or null if not found
+ */
+const getUserByEmail = async (email) => {
+  try {
+    await connect();
+    console.log(`[getUserByEmail] Looking for user with email ${email}`);
+    
+    // Validate email
+    validateEmail(email);
+    
+    const user = await usersCollection.findOne({ email });
+    if (!user) return null;
+    
+    return {
+      ...user,
+      id: user._id.toString(),
+      _id: undefined
+    };
+  } catch (error) {
+    console.error(`[getUserByEmail] Error for email ${email}:`, error);
     throw error;
   }
 };
@@ -281,94 +323,270 @@ const authenticateUser = async (email, password) => {
   try {
     await connect();
     
+    // Validate email
+    validateEmail(email);
+    
+    if (!password) {
+      throw new Error('Password is required');
+    }
+    
     // Find user by email
     const user = await usersCollection.findOne({ email });
-    if (!user) return null;
+    
+    if (!user) {
+      console.log(`[authenticateUser] User not found with email: ${email}`);
+      return null;
+    }
     
     // Verify password
     const isPasswordValid = await verifyPassword(password, user.password);
-    if (!isPasswordValid) return null;
     
-    // Return user without password
-    const { password: _, ...userWithoutPassword } = user;
+    if (!isPasswordValid) {
+      console.log(`[authenticateUser] Invalid password for email: ${email}`);
+      return null;
+    }
+    
+    console.log(`[authenticateUser] User authenticated successfully: ${user._id}`);
     return {
-      ...userWithoutPassword,
+      ...user,
       id: user._id.toString(),
-      _id: undefined
+      _id: undefined,
+      password: undefined // Remove password from returned user object
     };
   } catch (error) {
-    console.error(`[authenticateUser] Error for email ${email}:`, error);
+    console.error('[authenticateUser] Error:', error);
     throw error;
   }
 };
 
-// Token management for password reset
+/**
+ * Store a refresh token for a user
+ * @param {string} userId - User ID
+ * @param {string} refreshToken - Refresh token to store
+ * @returns {Promise<boolean>} Success status
+ */
+const storeRefreshToken = async (userId, refreshToken) => {
+  try {
+    await connect();
+    
+    if (!ObjectId.isValid(userId)) {
+      throw new Error('Invalid user ID format');
+    }
+    
+    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+    
+    if (!user) {
+      console.log(`[storeRefreshToken] User not found with id: ${userId}`);
+      return false;
+    }
+    
+    // Add new token (and maintain a limit of tokens per user)
+    let refreshTokens = user.refreshTokens || [];
+    refreshTokens.push(refreshToken);
+    
+    // Keep only the most recent tokens (limit to MAX_REFRESH_TOKENS)
+    if (refreshTokens.length > MAX_REFRESH_TOKENS) {
+      refreshTokens = refreshTokens.slice(-MAX_REFRESH_TOKENS);
+    }
+    
+    // Update user with new token
+    await usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          refreshTokens,
+          updatedAt: new Date()
+        } 
+      }
+    );
+    
+    console.log(`[storeRefreshToken] Refresh token stored for user: ${userId}`);
+    return true;
+  } catch (error) {
+    console.error('[storeRefreshToken] Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Verify if a refresh token exists for a user
+ * @param {string} userId - User ID
+ * @param {string} refreshToken - Refresh token to verify
+ * @returns {Promise<boolean>} Whether the token exists for the user
+ */
+const verifyRefreshToken = async (userId, refreshToken) => {
+  try {
+    await connect();
+    
+    if (!ObjectId.isValid(userId)) {
+      throw new Error('Invalid user ID format');
+    }
+    
+    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+    
+    if (!user) {
+      console.log(`[verifyRefreshToken] User not found with id: ${userId}`);
+      return false;
+    }
+    
+    // Check if token exists in user's refreshTokens array
+    const tokenExists = user.refreshTokens && user.refreshTokens.includes(refreshToken);
+    
+    console.log(`[verifyRefreshToken] Token verification result for user ${userId}: ${tokenExists}`);
+    return tokenExists;
+  } catch (error) {
+    console.error('[verifyRefreshToken] Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remove a refresh token from a user
+ * @param {string} userId - User ID
+ * @param {string} refreshToken - Refresh token to remove
+ * @returns {Promise<boolean>} Success status
+ */
+const removeRefreshToken = async (userId, refreshToken) => {
+  try {
+    await connect();
+    
+    if (!ObjectId.isValid(userId)) {
+      throw new Error('Invalid user ID format');
+    }
+    
+    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+    
+    if (!user) {
+      console.log(`[removeRefreshToken] User not found with id: ${userId}`);
+      return false;
+    }
+    
+    // Remove token from array
+    if (!user.refreshTokens) {
+      return true; // No tokens to remove
+    }
+    
+    const refreshTokens = user.refreshTokens.filter(token => token !== refreshToken);
+    
+    // Update user with new token array
+    await usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          refreshTokens,
+          updatedAt: new Date()
+        } 
+      }
+    );
+    
+    console.log(`[removeRefreshToken] Refresh token removed for user: ${userId}`);
+    return true;
+  } catch (error) {
+    console.error('[removeRefreshToken] Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate a password reset token for a user
+ * @param {string} email - User email
+ * @returns {Promise<Object|null>} User with reset token or null if user not found
+ */
 const generatePasswordResetToken = async (email) => {
   try {
     await connect();
     
+    // Validate email
+    validateEmail(email);
+    
     // Find user by email
     const user = await usersCollection.findOne({ email });
-    if (!user) return null;
     
-    // Generate token and expiration date (24 hours from now)
-    const resetToken = require('crypto').randomBytes(32).toString('hex');
-    const resetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    if (!user) {
+      console.log(`[generatePasswordResetToken] User not found with email: ${email}`);
+      return null;
+    }
     
-    // Update user with token and expiration
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetPasswordExpires = new Date(Date.now() + PASSWORD_RESET_EXPIRY);
+    
+    // Update user with reset token
     await usersCollection.updateOne(
       { _id: user._id },
-      {
-        $set: {
+      { 
+        $set: { 
           resetPasswordToken: resetToken,
-          resetPasswordExpires: resetExpires,
+          resetPasswordExpires,
           updatedAt: new Date()
-        }
+        } 
       }
     );
     
+    console.log(`[generatePasswordResetToken] Password reset token generated for user: ${user._id}`);
     return {
-      resetToken,
-      resetExpires
+      id: user._id.toString(),
+      email: user.email,
+      resetPasswordToken: resetToken,
+      resetPasswordExpires
     };
   } catch (error) {
-    console.error(`[generatePasswordResetToken] Error for email ${email}:`, error);
+    console.error('[generatePasswordResetToken] Error:', error);
     throw error;
   }
 };
 
-// Reset password using token
+/**
+ * Reset user password using reset token
+ * @param {string} token - Password reset token
+ * @param {string} newPassword - New password (plain text)
+ * @returns {Promise<boolean>} Success status
+ */
 const resetPassword = async (token, newPassword) => {
   try {
     await connect();
     
-    // Find user by token and check if token is expired
-    const user = await usersCollection.findOne({
+    if (!token) {
+      throw new Error('Reset token is required');
+    }
+    
+    if (!newPassword) {
+      throw new Error('New password is required');
+    }
+    
+    // Find user by reset token and check if token is still valid
+    const user = await usersCollection.findOne({ 
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: new Date() }
     });
     
-    if (!user) return false;
+    if (!user) {
+      console.log('[resetPassword] Invalid or expired reset token');
+      return false;
+    }
     
     // Hash new password
     const hashedPassword = await hashPassword(newPassword);
     
-    // Update user with new password and remove reset token
+    // Update user with new password and clear reset token
     await usersCollection.updateOne(
       { _id: user._id },
-      {
-        $set: {
+      { 
+        $set: { 
           password: hashedPassword,
-          resetPasswordToken: null,
-          resetPasswordExpires: null,
           updatedAt: new Date()
+        },
+        $unset: {
+          resetPasswordToken: "",
+          resetPasswordExpires: ""
         }
       }
     );
     
+    console.log(`[resetPassword] Password reset successful for user: ${user._id}`);
     return true;
   } catch (error) {
-    console.error(`[resetPassword] Error:`, error);
+    console.error('[resetPassword] Error:', error);
     throw error;
   }
 };
@@ -632,6 +850,7 @@ const deleteContextCard = async (userId, cardId) => {
 
 module.exports = {
   getUserById,
+  getUserByEmail,
   createUser,
   updateUser,
   authenticateUser,
@@ -645,6 +864,9 @@ module.exports = {
   createContextCard,
   updateContextCard,
   deleteContextCard,
+  storeRefreshToken,
+  verifyRefreshToken,
+  removeRefreshToken,
   closeConnection,
   // Export validation functions for testing
   validateEmail,
