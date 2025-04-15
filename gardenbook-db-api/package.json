@@ -6,13 +6,12 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest --forceExit",
+    "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage --forceExit",
-    "test:ci": "jest --ci --coverage --forceExit"
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
     "body-parser": "^1.20.2",
     "dotenv": "^16.4.7",
     "express": "^4.18.2",
@@ -27,7 +26,6 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "forceExit": true,
     "coveragePathIgnorePatterns": [
       "/node_modules/"
     ],
