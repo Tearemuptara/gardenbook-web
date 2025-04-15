@@ -1,210 +1,331 @@
-// Mock the model before requiring app
-jest.mock('../src/models/plant', () => ({
-  getAllPlants: jest.fn(),
-  getPlantById: jest.fn(),
-  createPlant: jest.fn(),
-  updatePlant: jest.fn(),
-  deletePlant: jest.fn()
-}));
-
 const request = require('supertest');
 const app = require('../src/app');
 const plantModel = require('../src/models/plant');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
+
+jest.mock('../src/models/plant');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const TEST_USER_ID = '60d21b4667d0d8992e610c85';
+
+// Helper function to generate JWT token for testing
+const generateTestToken = (userId) => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '1h' });
+};
 
 describe('Plants API', () => {
-  // Reset all mocks after each test
-  afterEach(() => {
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('GET /api/plants', () => {
-    it('should return all plants', async () => {
+    test('should return all plants when not authenticated (backward compatibility)', async () => {
       const mockPlants = [
-        { id: '1', name: 'Test Plant 1', scientificName: 'Test Scientific 1' },
-        { id: '2', name: 'Test Plant 2', scientificName: 'Test Scientific 2' }
+        { id: '1', name: 'Test Plant', scientificName: 'Test Scientific' },
+        { id: '2', name: 'Another Plant', scientificName: 'Another Scientific' }
       ];
       
       plantModel.getAllPlants.mockResolvedValue(mockPlants);
       
       const res = await request(app).get('/api/plants');
+      
       expect(res.statusCode).toEqual(200);
-      expect(res.body).toBeInstanceOf(Array);
-      expect(res.body.length).toEqual(2);
+      expect(res.body).toHaveLength(2);
+      expect(plantModel.getAllPlants).toHaveBeenCalled();
     });
 
-    it('should handle database errors', async () => {
+    test('should return user plants when authenticated', async () => {
+      const mockPlants = [
+        { id: '1', name: 'User Plant', scientificName: 'User Scientific', userId: TEST_USER_ID }
+      ];
+      
+      plantModel.getPlantsByUserId.mockResolvedValue(mockPlants);
+      
+      const token = generateTestToken(TEST_USER_ID);
+      
+      const res = await request(app)
+        .get('/api/plants')
+        .set('Authorization', `Bearer ${token}`);
+      
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveLength(1);
+      expect(plantModel.getPlantsByUserId).toHaveBeenCalledWith(TEST_USER_ID);
+    });
+    
+    test('should handle database errors', async () => {
       plantModel.getAllPlants.mockRejectedValue(new Error('Database error'));
       
       const res = await request(app).get('/api/plants');
+      
       expect(res.statusCode).toEqual(500);
       expect(res.body).toHaveProperty('error');
     });
   });
-
+  
   describe('GET /api/plants/:id', () => {
-    it('should return a plant by id', async () => {
+    test('should return a specific plant', async () => {
+      const mockPlant = { id: '1', name: 'Test Plant', scientificName: 'Test Scientific' };
+      plantModel.getPlantById.mockResolvedValue(mockPlant);
+      
+      const res = await request(app).get('/api/plants/1');
+      
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveProperty('id', '1');
+      expect(res.body.name).toEqual('Test Plant');
+    });
+    
+    test('should filter by userId when authenticated', async () => {
       const mockPlant = { 
         id: '1', 
-        name: 'Test Plant', 
-        scientificName: 'Test Scientific'
+        name: 'User Plant', 
+        scientificName: 'User Scientific',
+        userId: TEST_USER_ID 
       };
       
       plantModel.getPlantById.mockResolvedValue(mockPlant);
       
-      const res = await request(app).get('/api/plants/1');
+      const token = generateTestToken(TEST_USER_ID);
+      
+      const res = await request(app)
+        .get('/api/plants/1')
+        .set('Authorization', `Bearer ${token}`);
+      
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('id', '1');
-      expect(res.body).toHaveProperty('name', 'Test Plant');
-      expect(res.body).toHaveProperty('scientificName', 'Test Scientific');
+      expect(plantModel.getPlantById).toHaveBeenCalledWith('1', TEST_USER_ID);
     });
-
-    it('should return 404 if plant not found', async () => {
+    
+    test('should return 404 if plant not found', async () => {
       plantModel.getPlantById.mockResolvedValue(null);
       
       const res = await request(app).get('/api/plants/999');
+      
       expect(res.statusCode).toEqual(404);
       expect(res.body).toHaveProperty('error', 'Plant not found');
     });
-
-    it('should handle invalid ObjectId format', async () => {
+    
+    test('should handle invalid ID errors', async () => {
       plantModel.getPlantById.mockRejectedValue(new Error('Invalid ObjectId'));
       
       const res = await request(app).get('/api/plants/invalid-id');
+      
       expect(res.statusCode).toEqual(500);
       expect(res.body).toHaveProperty('error');
     });
   });
-
+  
   describe('POST /api/plants', () => {
-    it('should create a new plant', async () => {
+    test('should create a new plant when authenticated', async () => {
       const newPlant = {
-        name: 'Monstera',
-        scientificName: 'Monstera deliciosa',
-        careLevel: 'MODERATE',
+        name: 'New Plant',
+        scientificName: 'New Scientific',
+        careLevel: 'EASY',
         waterFrequency: 7
       };
       
-      plantModel.createPlant.mockResolvedValue({
+      const createdPlant = {
         ...newPlant,
-        id: 'new-id'
-      });
+        id: 'new-id',
+        userId: TEST_USER_ID
+      };
+      
+      plantModel.createPlant.mockResolvedValue(createdPlant);
+      
+      const token = generateTestToken(TEST_USER_ID);
       
       const res = await request(app)
         .post('/api/plants')
+        .set('Authorization', `Bearer ${token}`)
         .send(newPlant);
-        
+      
       expect(res.statusCode).toEqual(201);
       expect(res.body).toHaveProperty('id', 'new-id');
       expect(res.body.name).toEqual(newPlant.name);
       expect(res.body.scientificName).toEqual(newPlant.scientificName);
+      expect(plantModel.createPlant).toHaveBeenCalledWith(expect.objectContaining({
+        ...newPlant,
+        userId: TEST_USER_ID
+      }));
     });
-
-    it('should reject empty request body', async () => {
-      const res = await request(app)
-        .post('/api/plants')
-        .send({});
-        
-      expect(res.statusCode).toEqual(400);
-      expect(res.body).toHaveProperty('error', 'Request body is empty or invalid');
-    });
-
-    it('should handle database errors', async () => {
+    
+    test('should require authentication', async () => {
       const newPlant = {
-        name: 'Error Plant',
-        scientificName: 'Error Scientific Name'
+        name: 'New Plant',
+        scientificName: 'New Scientific',
+        careLevel: 'EASY',
+        waterFrequency: 7
       };
-      
-      plantModel.createPlant.mockRejectedValue(new Error('Database error'));
       
       const res = await request(app)
         .post('/api/plants')
         .send(newPlant);
-        
+      
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toHaveProperty('error', 'Authentication required');
+    });
+    
+    test('should reject empty request body', async () => {
+      const token = generateTestToken(TEST_USER_ID);
+      
+      const res = await request(app)
+        .post('/api/plants')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      
+      expect(res.statusCode).toEqual(400);
+      expect(res.body).toHaveProperty('error', 'Request body is empty or invalid');
+    });
+    
+    test('should handle database errors', async () => {
+      const newPlant = {
+        name: 'New Plant',
+        scientificName: 'New Scientific',
+        careLevel: 'EASY',
+        waterFrequency: 7
+      };
+      
+      plantModel.createPlant.mockRejectedValue(new Error('Database error'));
+      
+      const token = generateTestToken(TEST_USER_ID);
+      
+      const res = await request(app)
+        .post('/api/plants')
+        .set('Authorization', `Bearer ${token}`)
+        .send(newPlant);
+      
       expect(res.statusCode).toEqual(500);
       expect(res.body).toHaveProperty('error');
     });
   });
-
+  
   describe('PUT /api/plants/:id', () => {
-    it('should update an existing plant', async () => {
+    test('should update an existing plant when authenticated', async () => {
       const updatedPlant = {
         name: 'Updated Plant',
-        scientificName: 'Updated Scientific Name',
-        careLevel: 'DIFFICULT',
-        waterFrequency: 3
+        scientificName: 'Updated Scientific',
+        careLevel: 'MODERATE',
+        waterFrequency: 5
       };
       
-      plantModel.updatePlant.mockResolvedValue({
+      const returnedPlant = {
         ...updatedPlant,
-        id: '1'
-      });
+        id: '1',
+        userId: TEST_USER_ID
+      };
+      
+      plantModel.updatePlant.mockResolvedValue(returnedPlant);
+      
+      const token = generateTestToken(TEST_USER_ID);
       
       const res = await request(app)
         .put('/api/plants/1')
+        .set('Authorization', `Bearer ${token}`)
         .send(updatedPlant);
-        
+      
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('id', '1');
       expect(res.body.name).toEqual(updatedPlant.name);
       expect(res.body.scientificName).toEqual(updatedPlant.scientificName);
+      expect(plantModel.updatePlant).toHaveBeenCalledWith('1', updatedPlant, TEST_USER_ID);
     });
-
-    it('should return 404 if plant not found', async () => {
+    
+    test('should require authentication', async () => {
+      const updatedPlant = {
+        name: 'Updated Plant',
+        scientificName: 'Updated Scientific'
+      };
+      
+      const res = await request(app)
+        .put('/api/plants/1')
+        .send(updatedPlant);
+      
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toHaveProperty('error', 'Authentication required');
+    });
+    
+    test('should return 404 if plant not found or not owned by user', async () => {
       plantModel.updatePlant.mockResolvedValue(null);
+      
+      const token = generateTestToken(TEST_USER_ID);
       
       const res = await request(app)
         .put('/api/plants/999')
+        .set('Authorization', `Bearer ${token}`)
         .send({
-          name: 'Test',
-          scientificName: 'Test',
-          careLevel: 'EASY',
-          waterFrequency: 7
+          name: 'Updated Name'
         });
-        
+      
       expect(res.statusCode).toEqual(404);
-      expect(res.body).toHaveProperty('error', 'Plant not found');
+      expect(res.body).toHaveProperty('error', 'Plant not found or not owned by you');
     });
-
-    it('should reject empty request body', async () => {
+    
+    test('should reject empty request body', async () => {
+      const token = generateTestToken(TEST_USER_ID);
+      
       const res = await request(app)
         .put('/api/plants/1')
+        .set('Authorization', `Bearer ${token}`)
         .send({});
-        
+      
       expect(res.statusCode).toEqual(400);
       expect(res.body).toHaveProperty('error', 'Request body is empty or invalid');
     });
   });
-
+  
   describe('DELETE /api/plants/:id', () => {
-    it('should delete a plant', async () => {
+    test('should delete a plant when authenticated', async () => {
       const deletedPlant = {
         id: '1',
         name: 'Deleted Plant',
-        scientificName: 'Deleted Scientific Name'
+        userId: TEST_USER_ID
       };
       
       plantModel.deletePlant.mockResolvedValue(deletedPlant);
       
-      const res = await request(app).delete('/api/plants/1');
+      const token = generateTestToken(TEST_USER_ID);
+      
+      const res = await request(app)
+        .delete('/api/plants/1')
+        .set('Authorization', `Bearer ${token}`);
+      
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('id', '1');
       expect(res.body).toHaveProperty('name', 'Deleted Plant');
+      expect(plantModel.deletePlant).toHaveBeenCalledWith('1', TEST_USER_ID);
     });
-
-    it('should return 404 if plant not found', async () => {
+    
+    test('should require authentication', async () => {
+      const res = await request(app).delete('/api/plants/1');
+      
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toHaveProperty('error', 'Authentication required');
+    });
+    
+    test('should return 404 if plant not found or not owned by user', async () => {
       plantModel.deletePlant.mockResolvedValue(null);
       
-      const res = await request(app).delete('/api/plants/999');
+      const token = generateTestToken(TEST_USER_ID);
+      
+      const res = await request(app)
+        .delete('/api/plants/999')
+        .set('Authorization', `Bearer ${token}`);
+      
       expect(res.statusCode).toEqual(404);
-      expect(res.body).toHaveProperty('error', 'Plant not found');
+      expect(res.body).toHaveProperty('error', 'Plant not found or not owned by you');
     });
-
-    it('should handle database errors', async () => {
+    
+    test('should handle database errors', async () => {
       plantModel.deletePlant.mockRejectedValue(new Error('Database error'));
       
-      const res = await request(app).delete('/api/plants/1');
+      const token = generateTestToken(TEST_USER_ID);
+      
+      const res = await request(app)
+        .delete('/api/plants/1')
+        .set('Authorization', `Bearer ${token}`);
+      
       expect(res.statusCode).toEqual(500);
       expect(res.body).toHaveProperty('error');
     });
   });
-}); 
+});
