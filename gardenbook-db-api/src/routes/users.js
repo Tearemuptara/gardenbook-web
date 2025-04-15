@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userModel = require('../models/user');
 const { ObjectId } = require('mongodb');
+const { authenticateToken } = require('../middleware/auth');
 
 /**
  * @swagger
@@ -55,6 +56,8 @@ router.post('/', async (req, res) => {
  *   get:
  *     summary: Retrieve a user's encyclopedia data
  *     description: Retrieve the encyclopedia data for a specific user
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -72,12 +75,16 @@ router.post('/', async (req, res) => {
  *               properties:
  *                 encyclopedia:
  *                   type: string
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       403:
+ *         description: Forbidden - user can only access their own data
  *       404:
  *         description: User not found
  *       500:
  *         description: Server error
  */
-router.get('/:id/encyclopedia', async (req, res) => {
+router.get('/:id/encyclopedia', authenticateToken, async (req, res) => {
   const id = req.params.id;
   console.log(`[GET /users/${id}/encyclopedia] Request received`);
   
@@ -86,6 +93,12 @@ router.get('/:id/encyclopedia', async (req, res) => {
     if (!ObjectId.isValid(id)) {
       console.log(`[GET /users/${id}/encyclopedia] Invalid ObjectId: ${id}`);
       return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Verify that the authenticated user is accessing their own data
+    if (req.user.userId !== id) {
+      console.log(`[GET /users/${id}/encyclopedia] Unauthorized access attempt by user ${req.user.userId}`);
+      return res.status(403).json({ error: 'You can only access your own encyclopedia data' });
     }
     
     const encyclopedia = await userModel.getEncyclopedia(id);
@@ -108,6 +121,8 @@ router.get('/:id/encyclopedia', async (req, res) => {
  *   post:
  *     summary: Create or update a user's encyclopedia data
  *     description: Create or update the encyclopedia data for a specific user
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -139,12 +154,16 @@ router.get('/:id/encyclopedia', async (req, res) => {
  *                   type: string
  *       400:
  *         description: Invalid request data
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       403:
+ *         description: Forbidden - user can only update their own data
  *       404:
  *         description: User not found
  *       500:
  *         description: Server error
  */
-router.post('/:id/encyclopedia', async (req, res) => {
+router.post('/:id/encyclopedia', authenticateToken, async (req, res) => {
   const id = req.params.id;
   console.log(`[POST /users/${id}/encyclopedia] Request received with body:`, req.body);
   
@@ -153,6 +172,12 @@ router.post('/:id/encyclopedia', async (req, res) => {
     if (!ObjectId.isValid(id)) {
       console.log(`[POST /users/${id}/encyclopedia] Invalid ObjectId: ${id}`);
       return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Verify that the authenticated user is updating their own data
+    if (req.user.userId !== id) {
+      console.log(`[POST /users/${id}/encyclopedia] Unauthorized access attempt by user ${req.user.userId}`);
+      return res.status(403).json({ error: 'You can only update your own encyclopedia data' });
     }
     
     // Validate request body
@@ -182,6 +207,8 @@ router.post('/:id/encyclopedia', async (req, res) => {
  *   get:
  *     summary: Retrieve a user's context cards
  *     description: Retrieve all context cards for a specific user
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -214,12 +241,16 @@ router.post('/:id/encyclopedia', async (req, res) => {
  *                       updatedAt:
  *                         type: string
  *                         format: date-time
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       403:
+ *         description: Forbidden - user can only access their own data
  *       404:
  *         description: User not found
  *       500:
  *         description: Server error
  */
-router.get('/:id/context-cards', async (req, res) => {
+router.get('/:id/context-cards', authenticateToken, async (req, res) => {
   const id = req.params.id;
   console.log(`[GET /users/${id}/context-cards] Request received`);
   
@@ -228,6 +259,12 @@ router.get('/:id/context-cards', async (req, res) => {
     if (!ObjectId.isValid(id)) {
       console.log(`[GET /users/${id}/context-cards] Invalid ObjectId: ${id}`);
       return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Verify that the authenticated user is accessing their own data
+    if (req.user.userId !== id) {
+      console.log(`[GET /users/${id}/context-cards] Unauthorized access attempt by user ${req.user.userId}`);
+      return res.status(403).json({ error: 'You can only access your own context cards' });
     }
     
     const contextCards = await userModel.getContextCards(id);
@@ -250,6 +287,8 @@ router.get('/:id/context-cards', async (req, res) => {
  *   post:
  *     summary: Create a new context card
  *     description: Create a new context card for a specific user
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -298,12 +337,16 @@ router.get('/:id/context-cards', async (req, res) => {
  *                       format: date-time
  *       400:
  *         description: Invalid request data
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       403:
+ *         description: Forbidden - user can only create their own context cards
  *       404:
  *         description: User not found
  *       500:
  *         description: Server error
  */
-router.post('/:id/context-cards', async (req, res) => {
+router.post('/:id/context-cards', authenticateToken, async (req, res) => {
   const id = req.params.id;
   console.log(`[POST /users/${id}/context-cards] Request received with body:`, req.body);
   
@@ -312,6 +355,12 @@ router.post('/:id/context-cards', async (req, res) => {
     if (!ObjectId.isValid(id)) {
       console.log(`[POST /users/${id}/context-cards] Invalid ObjectId: ${id}`);
       return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Verify that the authenticated user is creating context cards for their own account
+    if (req.user.userId !== id) {
+      console.log(`[POST /users/${id}/context-cards] Unauthorized access attempt by user ${req.user.userId}`);
+      return res.status(403).json({ error: 'You can only create context cards for your own account' });
     }
     
     // Validate request body
@@ -345,6 +394,8 @@ router.post('/:id/context-cards', async (req, res) => {
  *   put:
  *     summary: Update a context card
  *     description: Update a specific context card for a user
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: userId
@@ -399,12 +450,16 @@ router.post('/:id/context-cards', async (req, res) => {
  *                       format: date-time
  *       400:
  *         description: Invalid request data
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       403:
+ *         description: Forbidden - user can only update their own context cards
  *       404:
  *         description: User or context card not found
  *       500:
  *         description: Server error
  */
-router.put('/:userId/context-cards/:cardId', async (req, res) => {
+router.put('/:userId/context-cards/:cardId', authenticateToken, async (req, res) => {
   const userId = req.params.userId;
   const cardId = req.params.cardId;
   console.log(`[PUT /users/${userId}/context-cards/${cardId}] Request received with body:`, req.body);
@@ -414,6 +469,12 @@ router.put('/:userId/context-cards/:cardId', async (req, res) => {
     if (!ObjectId.isValid(userId)) {
       console.log(`[PUT /users/${userId}/context-cards/${cardId}] Invalid user ObjectId: ${userId}`);
       return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Verify that the authenticated user is updating their own context card
+    if (req.user.userId !== userId) {
+      console.log(`[PUT /users/${userId}/context-cards/${cardId}] Unauthorized access attempt by user ${req.user.userId}`);
+      return res.status(403).json({ error: 'You can only update your own context cards' });
     }
     
     // Validate request body
@@ -447,6 +508,8 @@ router.put('/:userId/context-cards/:cardId', async (req, res) => {
  *   delete:
  *     summary: Delete a context card
  *     description: Delete a specific context card for a user
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: userId
@@ -473,12 +536,16 @@ router.put('/:userId/context-cards/:cardId', async (req, res) => {
  *                   example: true
  *       400:
  *         description: Invalid request data
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       403:
+ *         description: Forbidden - user can only delete their own context cards
  *       404:
  *         description: User or context card not found
  *       500:
  *         description: Server error
  */
-router.delete('/:userId/context-cards/:cardId', async (req, res) => {
+router.delete('/:userId/context-cards/:cardId', authenticateToken, async (req, res) => {
   const userId = req.params.userId;
   const cardId = req.params.cardId;
   console.log(`[DELETE /users/${userId}/context-cards/${cardId}] Request received`);
@@ -488,6 +555,12 @@ router.delete('/:userId/context-cards/:cardId', async (req, res) => {
     if (!ObjectId.isValid(userId)) {
       console.log(`[DELETE /users/${userId}/context-cards/${cardId}] Invalid user ObjectId: ${userId}`);
       return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    // Verify that the authenticated user is deleting their own context card
+    if (req.user.userId !== userId) {
+      console.log(`[DELETE /users/${userId}/context-cards/${cardId}] Unauthorized access attempt by user ${req.user.userId}`);
+      return res.status(403).json({ error: 'You can only delete your own context cards' });
     }
     
     // Delete context card
