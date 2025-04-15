@@ -9,10 +9,14 @@
  *         - scientificName
  *         - careLevel
  *         - waterFrequency
+ *         - userId
  *       properties:
  *         id:
  *           type: string
  *           description: The MongoDB ObjectId of the plant
+ *         userId:
+ *           type: string
+ *           description: The MongoDB ObjectId of the user who owns this plant
  *         name:
  *           type: string
  *           description: The name of the plant
@@ -85,10 +89,31 @@ const getAllPlants = async () => {
   }
 };
 
-const getPlantById = async (id) => {
+// Get plants for a specific user
+const getPlantsByUserId = async (userId) => {
   try {
     await connect();
-    const plant = await plantsCollection.findOne({ _id: new ObjectId(id) });
+    const plants = await plantsCollection.find({ userId }).toArray();
+    return plants.map(plant => ({
+      ...plant,
+      id: plant._id.toString(),
+      _id: undefined
+    }));
+  } catch (error) {
+    console.error(`[getPlantsByUserId] Error for userId ${userId}:`, error);
+    throw error;
+  }
+};
+
+const getPlantById = async (id, userId = null) => {
+  try {
+    await connect();
+    const query = { _id: new ObjectId(id) };
+    // If userId is provided, ensure the plant belongs to this user
+    if (userId) {
+      query.userId = userId;
+    }
+    const plant = await plantsCollection.findOne(query);
     if (!plant) return null;
     return {
       ...plant,
@@ -115,11 +140,16 @@ const createPlant = async (plantData) => {
   }
 };
 
-const updatePlant = async (id, plantData) => {
+const updatePlant = async (id, plantData, userId = null) => {
   try {
     await connect();
+    const query = { _id: new ObjectId(id) };
+    // If userId is provided, ensure the plant belongs to this user
+    if (userId) {
+      query.userId = userId;
+    }
     const result = await plantsCollection.findOneAndUpdate(
-      { _id: new ObjectId(id) },
+      query,
       { $set: plantData },
       { returnDocument: 'after' }
     );
@@ -135,10 +165,15 @@ const updatePlant = async (id, plantData) => {
   }
 };
 
-const deletePlant = async (id) => {
+const deletePlant = async (id, userId = null) => {
   try {
     await connect();
-    const result = await plantsCollection.findOneAndDelete({ _id: new ObjectId(id) });
+    const query = { _id: new ObjectId(id) };
+    // If userId is provided, ensure the plant belongs to this user
+    if (userId) {
+      query.userId = userId;
+    }
+    const result = await plantsCollection.findOneAndDelete(query);
     if (!result.value) return null;
     return {
       ...result.value,
@@ -153,6 +188,7 @@ const deletePlant = async (id) => {
 
 module.exports = {
   getAllPlants,
+  getPlantsByUserId,
   getPlantById,
   createPlant,
   updatePlant,
