@@ -1,6 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../../app/context/AuthContext';
 import { getCurrentUser, logoutUser } from '../../app/api/auth';
 
@@ -100,10 +99,7 @@ describe('AuthContext', () => {
     });
     
     // Click logout button
-    const user = userEvent.setup();
-    await act(async () => {
-      await user.click(screen.getByTestId('logout-button'));
-    });
+    screen.getByTestId('logout-button').click();
     
     // Should call logout API
     expect(logoutUser).toHaveBeenCalled();
