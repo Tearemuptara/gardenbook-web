@@ -7,11 +7,13 @@ import AuthCard from '../../components/auth/AuthCard';
 import FormInput from '../../components/auth/FormInput';
 import Button from '../../components/auth/Button';
 import { loginUser } from '../../api/auth';
+import { useAuth } from '../../context/AuthContext';
 
 // This component will be used inside the Suspense boundary
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -74,14 +76,20 @@ function LoginContent() {
     setSuccessMessage('');
     
     try {
-      await loginUser({
+      const userData = await loginUser({
         email: formData.email,
         password: formData.password,
         rememberMe: formData.rememberMe,
       });
       
-      // Redirect to home page after successful login
-      router.push('/myplants');
+      // Update auth context with user data
+      login(userData.user);
+      
+      // Check if there's a redirect URL in query params
+      const redirectTo = searchParams.get('redirect_to');
+      
+      // Redirect to requested page or default to myplants
+      router.push(redirectTo || '/myplants');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Login failed. Please check your credentials and try again.');
     } finally {
