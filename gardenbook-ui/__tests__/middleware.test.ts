@@ -1,20 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
 import middleware from '../middleware';
 
-// Mock NextRequest and NextResponse
-jest.mock('next/server', () => {
-  const originalModule = jest.requireActual('next/server');
-  return {
-    ...originalModule,
-    NextResponse: {
-      next: jest.fn(() => ({ status: 200 })),
-      redirect: jest.fn((url) => ({ status: 302, url })),
-    },
-  };
-});
+// Mock the next/server import using inline function definitions
+jest.mock('next/server', () => ({
+  NextResponse: {
+    next: jest.fn(() => ({ status: 200 })),
+    redirect: jest.fn((url) => ({ status: 302, url })),
+  },
+}));
+
+// Import the mocked module to access the mock functions
+import { NextResponse } from 'next/server';
 
 describe('Authentication Middleware', () => {
-  let mockRequest: NextRequest;
+  let mockRequest: any;
   
   beforeEach(() => {
     jest.clearAllMocks();
@@ -29,7 +27,7 @@ describe('Authentication Middleware', () => {
         get: jest.fn(),
       },
       url: 'http://localhost:3000',
-    } as unknown as NextRequest;
+    };
   });
   
   it('should allow access to public routes without authentication', () => {
@@ -53,9 +51,9 @@ describe('Authentication Middleware', () => {
     
     // Should redirect to login page with redirect_to parameter
     expect(NextResponse.redirect).toHaveBeenCalled();
-    const redirectCall = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
-    expect(redirectCall.toString()).toContain('/auth/login');
-    expect(redirectCall.toString()).toContain('redirect_to=/profile');
+    const redirectUrl = NextResponse.redirect.mock.calls[0][0];
+    expect(redirectUrl.toString()).toContain('/auth/login');
+    expect(redirectUrl.searchParams.get('redirect_to')).toBe('/profile');
   });
   
   it('should redirect authenticated users away from auth pages', () => {
@@ -69,8 +67,8 @@ describe('Authentication Middleware', () => {
     
     // Should redirect to myplants page
     expect(NextResponse.redirect).toHaveBeenCalled();
-    const redirectCall = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
-    expect(redirectCall.toString()).toContain('/myplants');
+    const redirectUrl = NextResponse.redirect.mock.calls[0][0];
+    expect(redirectUrl.toString()).toContain('/myplants');
   });
   
   it('should allow authenticated users to access protected routes', () => {
@@ -96,8 +94,8 @@ describe('Authentication Middleware', () => {
     
     // Should redirect to login page
     expect(NextResponse.redirect).toHaveBeenCalled();
-    const redirectCall = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
-    expect(redirectCall.toString()).toContain('/auth/login');
-    expect(redirectCall.toString()).toContain('redirect_to=/myplants/details/123');
+    const redirectUrl = NextResponse.redirect.mock.calls[0][0];
+    expect(redirectUrl.toString()).toContain('/auth/login');
+    expect(redirectUrl.searchParams.get('redirect_to')).toBe('/myplants/details/123');
   });
 }); 

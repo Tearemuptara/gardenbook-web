@@ -195,7 +195,7 @@ export default function ProfilePage() {
                 />
                 
                 <h3 className="text-lg font-medium text-gray-800 mt-8 mb-4">Change Password</h3>
-                <p className="text-sm text-gray-600 mb-4">Leave blank if you don't want to change your password</p>
+                <p className="text-sm text-gray-600 mb-4">Leave blank if you don&apos;t want to change your password</p>
                 
                 <FormInput
                   id="currentPassword"

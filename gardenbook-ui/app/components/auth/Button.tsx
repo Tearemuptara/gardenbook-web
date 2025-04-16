@@ -7,7 +7,7 @@ interface ButtonProps {
   onClick?: () => void;
   isLoading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
   children: React.ReactNode;
   fullWidth?: boolean;
   className?: string;
@@ -30,6 +30,7 @@ export default function Button({
     primary: 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500',
     secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
     outline: 'bg-transparent text-purple-600 border border-purple-600 hover:bg-purple-50 focus:ring-purple-500',
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   };
   
   const widthClass = fullWidth ? 'w-full' : '';

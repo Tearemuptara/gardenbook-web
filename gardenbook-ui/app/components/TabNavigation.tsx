@@ -15,6 +15,15 @@ interface TabProps {
   icon: React.ReactNode;
 }
 
+// Add interface for navigation tab items
+interface NavTabItem {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  requiresAuth: boolean;
+  onClick?: (() => void) | null;
+}
+
 const Tab = ({ href, label, active, icon }: TabProps) => {
   return (
     <Link href={href} className="block relative h-[46px]">
@@ -36,27 +45,30 @@ const Tab = ({ href, label, active, icon }: TabProps) => {
 
 export default function TabNavigation() {
   const pathname = usePathname();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   
   // Core navigation tabs
-  const coreTabs = [
+  const coreTabs: NavTabItem[] = [
     { 
       href: '/chat', 
       label: 'Chat', 
       icon: <BiChat size={20} />,
       requiresAuth: true,
+      onClick: null,
     },
     { 
       href: '/myplants', 
       label: 'My Plants', 
       icon: <PiPlantFill size={20} />,
       requiresAuth: true,
+      onClick: null,
     },
     { 
       href: '/encyclopedia', 
       label: 'Encyclopedia', 
       icon: <IoBookOutline size={20} />,
       requiresAuth: false,
+      onClick: null,
     }
   ];
   
@@ -96,7 +108,7 @@ export default function TabNavigation() {
   
   return (
     <div className="fixed right-0 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-10 w-0">
-      {visibleTabs.map((tab, index) => (
+      {visibleTabs.map((tab) => (
         tab.onClick 
           ? (
             <div key={tab.label} className="block relative h-[46px]" onClick={tab.onClick}>
